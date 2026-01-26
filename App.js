@@ -1,12 +1,15 @@
-import { StatusBar } from 'expo-status-bar';
-import { AuthProvider } from './contexts/AuthContext';
-import AppNavigator from './navigation/AppNavigator';
+import { StatusBar } from "expo-status-bar";
+import { AuthProvider } from "./contexts/AuthContext";
+import { CartProvider } from "./contexts/CartContext";
+import AppNavigator from "./navigation/AppNavigator";
 
 export default function App() {
   return (
     <AuthProvider>
-      <AppNavigator />
-      <StatusBar style="auto" />
+      <CartProvider>
+        <AppNavigator />
+        <StatusBar style="auto" />
+      </CartProvider>
     </AuthProvider>
   );
 }
