@@ -1,36 +1,36 @@
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
 // API Base URL - Automatically detect platform
 // IMPORTANT: For real device, change this IP to your computer's IP address
 // You can find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-const API_HOST = '10.10.8.186'; // Change this to your computer's IP
+const API_HOST = "10.10.9.28"; // Change this to your computer's IP
 
 const getApiBaseUrl = () => {
-  if (Platform.OS === 'web') {
-    return 'http://localhost:3000/api/v1';
-  } else if (Platform.OS === 'android') {
+  if (Platform.OS === "web") {
+    return "http://localhost:3000/api/v1";
+  } else if (Platform.OS === "android") {
     // Check if running on emulator or real device
     // 10.0.2.2 is for Android emulator, API_HOST is for real device
     return `http://${API_HOST}:3000/api/v1`;
-  } else if (Platform.OS === 'ios') {
+  } else if (Platform.OS === "ios") {
     return `http://${API_HOST}:3000/api/v1`;
   } else {
-    return 'http://localhost:3000/api/v1';
+    return "http://localhost:3000/api/v1";
   }
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
-console.log('🌐 API Base URL:', API_BASE_URL);
+console.log("🌐 API Base URL:", API_BASE_URL);
 
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -38,52 +38,58 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await AsyncStorage.getItem("userToken");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-      console.log('📤 API Request:', config.method?.toUpperCase(), config.url);
+      console.log("📤 API Request:", config.method?.toUpperCase(), config.url);
     } catch (error) {
-      console.error('❌ Error getting token:', error);
+      console.error("❌ Error getting token:", error);
     }
     return config;
   },
   (error) => {
-    console.error('❌ Request Error:', error);
+    console.error("❌ Request Error:", error);
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor - Handle errors
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ API Response:', response.config.method?.toUpperCase(), response.config.url, '- Status:', response.status);
+    console.log(
+      "✅ API Response:",
+      response.config.method?.toUpperCase(),
+      response.config.url,
+      "- Status:",
+      response.status,
+    );
     return response;
   },
   async (error) => {
-    console.error('❌ API Error:', error.message);
+    console.error("❌ API Error:", error.message);
     if (error.response) {
-      console.error('Response Status:', error.response.status);
-      console.error('Response Data:', error.response.data);
+      console.error("Response Status:", error.response.status);
+      console.error("Response Data:", error.response.data);
     } else if (error.request) {
-      console.error('No Response - Network Error');
-      console.error('Request:', error.request);
+      console.error("No Response - Network Error");
+      console.error("Request:", error.request);
     }
 
     if (error.response?.status === 401) {
       // Token expired or invalid
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem("userToken");
+      await AsyncStorage.removeItem("user");
       // Navigate to login - handled by AuthContext
     }
 
     const errorMessage =
-      error.response?.data?.error || 
-      error.response?.data?.message || 
-      error.message || 
-      'Network error';
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.message ||
+      "Network error";
     return Promise.reject(new Error(errorMessage));
-  }
+  },
 );
 
 export default api;

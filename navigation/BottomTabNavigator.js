@@ -1,16 +1,18 @@
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
-import HomeScreen from '../screens/HomeScreen';
-import CartScreen from '../screens/CartScreen';
-import RecipeScreen from '../screens/RecipeScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import WelcomeScreen from '../screens/WelcomeScreen';
-import { useAuth } from '../contexts/AuthContext';
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { Ionicons } from "@expo/vector-icons";
+import HomeScreen from "../screens/HomeScreen";
+import CartScreen from "../screens/CartScreen";
+import RecipeScreen from "../screens/RecipeScreen";
+import ProfileScreen from "../screens/ProfileScreen";
+import WelcomeScreen from "../screens/WelcomeScreen";
+import { useAuth } from "../contexts/AuthContext";
+import { useCart } from "../contexts/CartContext";
 
 const Tab = createBottomTabNavigator();
 
 export default function BottomTabNavigator() {
   const { user } = useAuth();
+  const { cartItemCount } = useCart();
 
   return (
     <Tab.Navigator
@@ -18,64 +20,63 @@ export default function BottomTabNavigator() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
-          if (route.name === 'HomeTab') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'CartTab') {
-            iconName = focused ? 'cart' : 'cart-outline';
-          } else if (route.name === 'RecipeTab') {
-            iconName = focused ? 'restaurant' : 'restaurant-outline';
-          } else if (route.name === 'ProfileTab') {
-            iconName = focused ? 'person' : 'person-outline';
+          if (route.name === "HomeTab") {
+            iconName = focused ? "home" : "home-outline";
+          } else if (route.name === "CartTab") {
+            iconName = focused ? "cart" : "cart-outline";
+          } else if (route.name === "RecipeTab") {
+            iconName = focused ? "restaurant" : "restaurant-outline";
+          } else if (route.name === "ProfileTab") {
+            iconName = focused ? "person" : "person-outline";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#4CAF50',
-        tabBarInactiveTintColor: '#999',
+        tabBarActiveTintColor: "#4CAF50",
+        tabBarInactiveTintColor: "#999",
         tabBarStyle: {
           paddingBottom: 5,
           paddingTop: 5,
           height: 60,
+          backgroundColor: "#fff",
+          borderTopWidth: 1,
+          borderTopColor: "#f0f0f0",
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
         },
-        headerStyle: {
-          backgroundColor: '#4CAF50',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerShown: false,
       })}
     >
-      <Tab.Screen 
-        name="HomeTab" 
+      <Tab.Screen
+        name="HomeTab"
         component={HomeScreen}
-        options={{ 
-          title: 'Trang Chủ',
-          tabBarLabel: 'Trang Chủ',
+        options={{
+          tabBarLabel: "Trang Chủ",
         }}
       />
-      <Tab.Screen 
-        name="CartTab" 
+      <Tab.Screen
+        name="CartTab"
         component={CartScreen}
-        options={{ 
-          title: 'Giỏ Hàng',
-          tabBarLabel: 'Giỏ Hàng',
+        options={{
+          tabBarLabel: "Giỏ Hàng",
+          tabBarBadge: cartItemCount > 0 ? cartItemCount : null,
         }}
       />
-      <Tab.Screen 
-        name="RecipeTab" 
+      <Tab.Screen
+        name="RecipeTab"
         component={RecipeScreen}
-        options={{ 
-          title: 'Công Thức',
-          tabBarLabel: 'Công Thức',
+        options={{
+          tabBarLabel: "Công Thức",
         }}
       />
-      <Tab.Screen 
-        name="ProfileTab" 
+      <Tab.Screen
+        name="ProfileTab"
         component={user ? ProfileScreen : WelcomeScreen}
-        options={{ 
-          title: 'Cá Nhân',
-          tabBarLabel: 'Cá Nhân',
+        options={{
+          tabBarLabel: "Cá Nhân",
         }}
       />
     </Tab.Navigator>
