@@ -1,10 +1,37 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect } from 'react';
+import profileService from '../services/profileService';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const [avatarUrl, setAvatarUrl] = useState(null);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  useEffect(() => {
+    // Reload profile when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProfile();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadProfile = async () => {
+    try {
+      const response = await profileService.getMyProfile();
+      if (response.data.avatar_url) {
+        setAvatarUrl(response.data.avatar_url);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -32,7 +59,11 @@ export default function ProfileScreen({ navigation }) {
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
-            <Ionicons name="person-circle" size={100} color="#4CAF50" />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Ionicons name="person-circle" size={100} color="#4CAF50" />
+            )}
           </View>
           {user && (
             <View style={styles.userInfo}>
@@ -46,6 +77,17 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.menuContainer}>
           <Text style={styles.sectionTitle}>Tài khoản</Text>
           
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('EditProfile')}
+          >
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="create-outline" size={24} color="#4CAF50" />
+              <Text style={styles.menuItemText}>Chỉnh Sửa Profile</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#999" />
+          </TouchableOpacity>
+
           <TouchableOpacity 
             style={styles.menuItem}
             onPress={() => navigation.navigate('ChangePassword')}
@@ -109,6 +151,12 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 16,
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f0f0f0',
   },
   userInfo: {
     alignItems: 'center',
