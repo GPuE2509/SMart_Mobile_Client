@@ -31,7 +31,6 @@ export default function CategoryListScreen({ navigation }) {
         setCategories(response.data || []);
       }
     } catch (error) {
-      console.error("Error loading categories:", error);
       Alert.alert("Lỗi", "Không thể tải danh mục. Vui lòng thử lại.");
     } finally {
       setLoading(false);

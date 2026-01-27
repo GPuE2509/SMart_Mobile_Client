@@ -46,7 +46,8 @@ export default function ForgotPasswordScreen({ navigation }) {
         ]
       );
     } catch (error) {
-      Alert.alert('Lỗi', error.message || 'Không thể gửi mã OTP. Vui lòng thử lại.');
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Không thể gửi mã OTP. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
     } finally {
       setLoading(false);
     }

@@ -60,7 +60,8 @@ export default function ChangePasswordScreen({ navigation }) {
         ]
       );
     } catch (error) {
-      Alert.alert('Lỗi', error.message || 'Đổi mật khẩu thất bại. Vui lòng thử lại.');
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
     } finally {
       setLoading(false);
     }
