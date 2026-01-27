@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,16 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  FlatList,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import productService from "../services/productService";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function ProductDetailScreen({ navigation, route }) {
   const { user } = useAuth();
@@ -25,6 +29,9 @@ export default function ProductDetailScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [images, setImages] = useState([]);
+  const flatListRef = useRef(null);
 
   // Load product data
   useEffect(() => {
@@ -39,6 +46,21 @@ export default function ProductDetailScreen({ navigation, route }) {
       if (productRes.success) {
         const productData = productRes.data;
         setProduct(productData);
+
+        // Setup image gallery - use multiple images if available, otherwise use main image
+        const productImages = [];
+        if (productData.image_url) {
+          productImages.push(productData.image_url);
+        }
+        // If product has additional_images array, add them
+        if (productData.additional_images && productData.additional_images.length > 0) {
+          productImages.push(...productData.additional_images);
+        }
+        // If still no images, add a placeholder
+        if (productImages.length === 0) {
+          productImages.push('https://via.placeholder.com/400x300?text=No+Image');
+        }
+        setImages(productImages);
 
         // Units are already included in product data
         if (productData.units && productData.units.length > 0) {
@@ -108,13 +130,14 @@ export default function ProductDetailScreen({ navigation, route }) {
       return;
     }
 
-    addToCart(product._id, selectedUnit._id, quantity);
+    // Fix: Pass correct parameters (productId, productUnit, product, quantity)
+    addToCart(product._id, selectedUnit, product, quantity);
     Alert.alert(
       "Thành công",
       `Đã thêm ${quantity} ${selectedUnit.unit_id?.name || "sản phẩm"} ${product.name} vào giỏ hàng`,
       [
         { text: "Tiếp tục mua", style: "cancel" },
-        { text: "Xem giỏ hàng", onPress: () => navigation.navigate("Cart") },
+        { text: "Xem giỏ hàng", onPress: () => navigation.navigate("MainTabs", { screen: "CartTab" }) },
       ],
     );
   };
@@ -162,20 +185,62 @@ export default function ProductDetailScreen({ navigation, route }) {
         <Text style={styles.headerTitle}>Chi tiết sản phẩm</Text>
         <TouchableOpacity
           style={styles.headerButton}
-          onPress={() => navigation.navigate("Cart")}
+          onPress={() => navigation.navigate("MainTabs", { screen: "CartTab" })}
         >
           <Ionicons name="cart-outline" size={24} color="#333" />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView}>
-        {/* Product Image */}
+        {/* Product Image Gallery */}
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: product.image_url }}
-            style={styles.productImage}
-            resizeMode="cover"
+          <FlatList
+            ref={flatListRef}
+            data={images}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item, index) => `image-${index}`}
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(
+                event.nativeEvent.contentOffset.x / SCREEN_WIDTH
+              );
+              setCurrentImageIndex(index);
+            }}
+            renderItem={({ item }) => (
+              <View style={styles.imageSlide}>
+                <Image
+                  source={{ uri: item }}
+                  style={styles.productImage}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
           />
+          
+          {/* Image Indicators */}
+          {images.length > 1 && (
+            <View style={styles.imageIndicators}>
+              {images.map((_, index) => (
+                <View
+                  key={`indicator-${index}`}
+                  style={[
+                    styles.indicator,
+                    currentImageIndex === index && styles.activeIndicator,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+          
+          {/* Image Counter */}
+          {images.length > 1 && (
+            <View style={styles.imageCounter}>
+              <Text style={styles.imageCounterText}>
+                {currentImageIndex + 1} / {images.length}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Product Info */}
@@ -389,13 +454,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   imageContainer: {
-    width: "100%",
+    width: SCREEN_WIDTH,
     height: 300,
     backgroundColor: "#f5f5f5",
+    position: "relative",
+  },
+  imageSlide: {
+    width: SCREEN_WIDTH,
+    height: 300,
   },
   productImage: {
     width: "100%",
     height: "100%",
+  },
+  imageIndicators: {
+    position: "absolute",
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  indicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+  },
+  activeIndicator: {
+    width: 24,
+    backgroundColor: "#fff",
+  },
+  imageCounter: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  imageCounterText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
   },
   infoSection: {
     padding: 16,

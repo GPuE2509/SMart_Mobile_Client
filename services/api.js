@@ -12,8 +12,8 @@ const getApiBaseUrl = () => {
     return "http://localhost:3000/api/v1";
   } else if (Platform.OS === "android") {
     // Check if running on emulator or real device
-    // 10.0.2.2 is for Android emulator, API_HOST is for real device
-    return `http://${API_HOST}:3000/api/v1`;
+    // For emulator: use computer IP (not 10.0.2.2 or localhost)
+    return `http://${API_HOST}:3000/api/v1`; // ✅ Use computer IP for emulator
   } else if (Platform.OS === "ios") {
     return `http://${API_HOST}:3000/api/v1`;
   } else {

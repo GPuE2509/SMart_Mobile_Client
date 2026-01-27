@@ -2,8 +2,8 @@
 export const API_CONFIG = {
   // Change this IP to your computer's IP address
   // You can find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-  // Current IP: 10.10.8.186
-  HOST: '10.10.8.186',
+  // Current IP: 10.64.166.25
+  HOST: '10.64.166.25',
   PORT: '3000',
   VERSION: 'v1',
 };
