@@ -5,7 +5,7 @@ const authService = {
   // Sign in
   signin: async (email, password) => {
     try {
-      const response = await api.post('/auth/mobile/signin', { email, password });
+      const response = await api.post('/auth/signin', { email, password });
       
       console.log('📡 Signin response:', response.data);
       
