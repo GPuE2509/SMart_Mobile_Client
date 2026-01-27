@@ -5,7 +5,7 @@ import { Platform } from "react-native";
 // API Base URL - Automatically detect platform
 // IMPORTANT: For real device, change this IP to your computer's IP address
 // You can find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-const API_HOST = "192.168.210.93"; // ⚠️ CHANGE THIS to your computer's IP from ipconfig!
+const API_HOST = "10.10.10.101"; // Change this to your computer's IP
 
 const getApiBaseUrl = () => {
   if (Platform.OS === "web") {
@@ -22,8 +22,6 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-
-console.log("🌐 API Base URL:", API_BASE_URL);
 
 // Create axios instance
 const api = axios.create({
@@ -42,14 +40,12 @@ api.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-      console.log("📤 API Request:", config.method?.toUpperCase(), config.url);
     } catch (error) {
-      console.error("❌ Error getting token:", error);
+      // Error getting token
     }
     return config;
   },
   (error) => {
-    console.error("❌ Request Error:", error);
     return Promise.reject(error);
   },
 );
@@ -57,25 +53,9 @@ api.interceptors.request.use(
 // Response interceptor - Handle errors
 api.interceptors.response.use(
   (response) => {
-    console.log(
-      "✅ API Response:",
-      response.config.method?.toUpperCase(),
-      response.config.url,
-      "- Status:",
-      response.status,
-    );
     return response;
   },
   async (error) => {
-    console.error("❌ API Error:", error.message);
-    if (error.response) {
-      console.error("Response Status:", error.response.status);
-      console.error("Response Data:", error.response.data);
-    } else if (error.request) {
-      console.error("No Response - Network Error");
-      console.error("Request:", error.request);
-    }
-
     if (error.response?.status === 401) {
       // Token expired or invalid
       await AsyncStorage.removeItem("userToken");

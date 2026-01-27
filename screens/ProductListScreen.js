@@ -82,7 +82,6 @@ export default function ProductListScreen({ navigation, route }) {
         if (!reset) setPage((prev) => prev + 1);
       }
     } catch (error) {
-      console.error("Error loading products:", error);
       Alert.alert("Lỗi", "Không thể tải danh sách sản phẩm");
       if (reset) setProducts([]);
     } finally {

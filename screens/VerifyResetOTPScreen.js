@@ -63,7 +63,8 @@ export default function VerifyResetOTPScreen({ navigation, route }) {
       // Navigate to ResetPassword screen with email and verified OTP
       navigation.navigate('ResetPasswordNew', { email, otp: otpCode });
     } catch (error) {
-      Alert.alert('Lỗi', error.message || 'Mã OTP không đúng. Vui lòng thử lại.');
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Mã OTP không đúng. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
     } finally {
       setLoading(false);
     }

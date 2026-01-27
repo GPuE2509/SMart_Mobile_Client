@@ -73,7 +73,6 @@ export default function ProductDetailScreen({ navigation, route }) {
         Alert.alert("Lỗi", productRes.message || "Không tìm thấy sản phẩm");
       }
     } catch (error) {
-      console.error("Error loading product:", error);
       Alert.alert("Lỗi", `Không thể tải thông tin sản phẩm: ${error.message}`);
     } finally {
       setLoading(false);

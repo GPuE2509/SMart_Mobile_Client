@@ -31,7 +31,7 @@ export const CartProvider = ({ children }) => {
         setCartItems(JSON.parse(savedCart));
       }
     } catch (error) {
-      console.error("Error loading cart:", error);
+      // Error loading cart
     }
   };
 
@@ -39,7 +39,7 @@ export const CartProvider = ({ children }) => {
     try {
       await AsyncStorage.setItem("cart", JSON.stringify(cartItems));
     } catch (error) {
-      console.error("Error saving cart:", error);
+      // Error saving cart
     }
   };
 
@@ -52,7 +52,6 @@ export const CartProvider = ({ children }) => {
    */
   const addToCart = (productId, productUnit, product, quantity = 1) => {
     if (!product || !productUnit) {
-      console.error("Product or ProductUnit not found");
       return;
     }
 
