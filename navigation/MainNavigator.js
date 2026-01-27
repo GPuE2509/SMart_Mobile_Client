@@ -4,6 +4,7 @@ import CheckoutScreen from "../screens/CheckoutScreen";
 import OrderHistoryScreen from "../screens/OrderHistoryScreen";
 import CouponScreen from "../screens/CouponScreen";
 import ChangePasswordScreen from "../screens/ChangePasswordScreen";
+import EditProfileScreen from "../screens/EditProfileScreen";
 import LoginScreen from "../screens/LoginScreen";
 import SignupScreen from "../screens/SignupScreen";
 import VerifyOTPScreen from "../screens/VerifyOTPScreen";
@@ -100,6 +101,13 @@ export default function MainNavigator() {
         options={{
           title: "Đổi Mật Khẩu",
           headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{
+          title: "Chỉnh Sửa Profile",
         }}
       />
     </Stack.Navigator>
