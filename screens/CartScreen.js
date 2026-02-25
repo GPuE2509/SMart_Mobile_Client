@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,30 +13,7 @@ import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import CartItem from "../components/CartItem";
-
-// Mock coupons data
-const coupons = [
-  {
-    code: "WELCOME10",
-    description: "Giảm 10% cho đơn hàng đầu tiên",
-    discount_type: "percent",
-    discount_value: 10,
-    min_order_value: 100000,
-    max_discount_amount: 50000,
-    status: "active",
-    end_date: "2026-12-31",
-  },
-  {
-    code: "SAVE50K",
-    description: "Giảm 50.000đ cho đơn từ 500.000đ",
-    discount_type: "fixed_amount",
-    discount_value: 50000,
-    min_order_value: 500000,
-    max_discount_amount: 50000,
-    status: "active",
-    end_date: "2026-12-31",
-  },
-];
+import userCouponService from "../services/userCouponService";
 
 export default function CartScreen({ navigation }) {
   const { user } = useAuth();
@@ -44,6 +21,34 @@ export default function CartScreen({ navigation }) {
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState("");
+  const [walletCoupons, setWalletCoupons] = useState([]);
+  const [appliedUserCouponId, setAppliedUserCouponId] = useState(null);
+
+  useEffect(() => {
+    const loadUserCoupons = async () => {
+      if (!user) {
+        setWalletCoupons([]);
+        return;
+      }
+
+      try {
+        const response = await userCouponService.getMyCoupons({
+          is_used: false,
+        });
+
+        if (response.success && Array.isArray(response.data)) {
+          setWalletCoupons(response.data);
+        } else {
+          setWalletCoupons([]);
+        }
+      } catch (error) {
+        console.error("Error loading user coupons:", error);
+        setWalletCoupons([]);
+      }
+    };
+
+    loadUserCoupons();
+  }, [user]);
 
   const handleApplyCoupon = () => {
     if (!couponCode.trim()) {
@@ -51,18 +56,30 @@ export default function CartScreen({ navigation }) {
       return;
     }
 
-    // Find coupon
-    const coupon = coupons.find(
-      (c) =>
-        c.code.toLowerCase() === couponCode.trim().toLowerCase() &&
-        c.status === "active",
-    );
-
-    if (!coupon) {
-      setCouponError("Mã giảm giá không hợp lệ");
-      setAppliedCoupon(null);
+    if (!user) {
+      setCouponError("Vui lòng đăng nhập để sử dụng mã giảm giá");
       return;
     }
+
+    // Find coupon from user's wallet (user_coupons)
+    const userCoupon = walletCoupons.find((uc) => {
+      const code = uc.coupon?.code || "";
+      const matchesCode =
+        code.toLowerCase() === couponCode.trim().toLowerCase();
+      const isActive = uc.coupon?.status === "active";
+      const notUsed = uc.is_used === false;
+      const notExpired = !uc.is_expired;
+      return matchesCode && isActive && notUsed && notExpired;
+    });
+
+    if (!userCoupon || !userCoupon.coupon) {
+      setCouponError("Mã giảm giá không hợp lệ");
+      setAppliedCoupon(null);
+      setAppliedUserCouponId(null);
+      return;
+    }
+
+    const coupon = userCoupon.coupon;
 
     // Check if coupon has expired
     const now = new Date();
@@ -84,6 +101,7 @@ export default function CartScreen({ navigation }) {
 
     // Apply coupon
     setAppliedCoupon(coupon);
+    setAppliedUserCouponId(userCoupon._id);
     setCouponError("");
     Alert.alert("Thành công", `Đã áp dụng mã giảm giá: ${coupon.code}`);
   };
@@ -92,6 +110,7 @@ export default function CartScreen({ navigation }) {
     setAppliedCoupon(null);
     setCouponCode("");
     setCouponError("");
+    setAppliedUserCouponId(null);
   };
 
   // Calculate discount
@@ -139,6 +158,7 @@ export default function CartScreen({ navigation }) {
     navigation.navigate("Checkout", {
       couponCode: appliedCoupon?.code || "",
       discount: discount.toString(),
+      userCouponId: appliedUserCouponId || "",
     });
   };
 

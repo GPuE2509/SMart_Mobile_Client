@@ -101,6 +101,7 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.quickAction, { backgroundColor: "#4ECDC4" }]}
+              onPress={() => navigation.navigate("Coupon")}
             >
               <Ionicons name="gift" size={24} color="#fff" />
               <Text style={styles.quickActionText}>Ưu Đãi</Text>

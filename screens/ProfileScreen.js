@@ -121,6 +121,17 @@ export default function ProfileScreen({ navigation }) {
             <Ionicons name="chevron-forward" size={24} color="#999" />
           </TouchableOpacity>
 
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('UserCoupons')}
+          >
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="wallet-outline" size={24} color="#4CAF50" />
+              <Text style={styles.menuItemText}>Ví Voucher</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#999" />
+          </TouchableOpacity>
+
           <Text style={styles.sectionTitle}>Khác</Text>
 
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
