@@ -53,12 +53,17 @@ export default function ProductDetailScreen({ navigation, route }) {
           productImages.push(productData.image_url);
         }
         // If product has additional_images array, add them
-        if (productData.additional_images && productData.additional_images.length > 0) {
+        if (
+          productData.additional_images &&
+          productData.additional_images.length > 0
+        ) {
           productImages.push(...productData.additional_images);
         }
         // If still no images, add a placeholder
         if (productImages.length === 0) {
-          productImages.push('https://via.placeholder.com/400x300?text=No+Image');
+          productImages.push(
+            "https://via.placeholder.com/400x300?text=No+Image",
+          );
         }
         setImages(productImages);
 
@@ -125,8 +130,18 @@ export default function ProductDetailScreen({ navigation, route }) {
       return;
     }
 
-    if (product.total_stock === 0) {
-      Alert.alert("Thông báo", "Sản phẩm hiện đã hết hàng");
+    const availableStock = selectedUnit.available_stock || 0;
+
+    if (availableStock === 0) {
+      Alert.alert("Thông báo", "Đơn vị này hiện đã hết hàng");
+      return;
+    }
+
+    if (quantity > availableStock) {
+      Alert.alert(
+        "Thông báo",
+        `Số lượng tồn kho không đủ. Chỉ còn ${availableStock} ${selectedUnit.unit_id?.name || "sản phẩm"}`,
+      );
       return;
     }
 
@@ -137,13 +152,17 @@ export default function ProductDetailScreen({ navigation, route }) {
       `Đã thêm ${quantity} ${selectedUnit.unit_id?.name || "sản phẩm"} ${product.name} vào giỏ hàng`,
       [
         { text: "Tiếp tục mua", style: "cancel" },
-        { text: "Xem giỏ hàng", onPress: () => navigation.navigate("MainTabs", { screen: "CartTab" }) },
+        {
+          text: "Xem giỏ hàng",
+          onPress: () => navigation.navigate("MainTabs", { screen: "CartTab" }),
+        },
       ],
     );
   };
 
   const increaseQuantity = () => {
-    if (selectedUnit && quantity < product.total_stock) {
+    const maxStock = selectedUnit?.available_stock || 0;
+    if (selectedUnit && quantity < maxStock) {
       setQuantity(quantity + 1);
     }
   };
@@ -158,19 +177,24 @@ export default function ProductDetailScreen({ navigation, route }) {
     return price.toLocaleString("vi-VN") + "đ";
   };
 
+  // Calculate stock status based on selected unit or total product stock
+  const getCurrentStock = () => {
+    if (selectedUnit) {
+      return selectedUnit.available_stock || 0;
+    }
+    return product.total_stock || 0;
+  };
+
+  const currentStock = getCurrentStock();
   const stockStatus =
-    product.total_stock > 10
+    currentStock > 10
       ? "Còn hàng"
-      : product.total_stock > 0
-        ? `Chỉ còn ${product.total_stock} sản phẩm`
+      : currentStock > 0
+        ? `Chỉ còn ${currentStock} ${selectedUnit ? selectedUnit.unit_id?.name || "sản phẩm" : "sản phẩm"}`
         : "Hết hàng";
 
   const stockColor =
-    product.total_stock > 10
-      ? "#4CAF50"
-      : product.total_stock > 0
-        ? "#FF9800"
-        : "#f44336";
+    currentStock > 10 ? "#4CAF50" : currentStock > 0 ? "#FF9800" : "#f44336";
 
   return (
     <SafeAreaView style={styles.container}>
@@ -203,7 +227,7 @@ export default function ProductDetailScreen({ navigation, route }) {
             keyExtractor={(item, index) => `image-${index}`}
             onMomentumScrollEnd={(event) => {
               const index = Math.round(
-                event.nativeEvent.contentOffset.x / SCREEN_WIDTH
+                event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
               );
               setCurrentImageIndex(index);
             }}
@@ -217,7 +241,7 @@ export default function ProductDetailScreen({ navigation, route }) {
               </View>
             )}
           />
-          
+
           {/* Image Indicators */}
           {images.length > 1 && (
             <View style={styles.imageIndicators}>
@@ -232,7 +256,7 @@ export default function ProductDetailScreen({ navigation, route }) {
               ))}
             </View>
           )}
-          
+
           {/* Image Counter */}
           {images.length > 1 && (
             <View style={styles.imageCounter}>
@@ -284,48 +308,72 @@ export default function ProductDetailScreen({ navigation, route }) {
             <View style={styles.unitSelectionContainer}>
               <Text style={styles.sectionTitle}>Chọn đơn vị</Text>
               <View style={styles.unitOptions}>
-                {productUnits.map((unit) => (
-                  <TouchableOpacity
-                    key={unit._id}
-                    style={[
-                      styles.unitOption,
-                      selectedUnit?._id === unit._id && styles.unitOptionActive,
-                    ]}
-                    onPress={() => {
-                      setSelectedUnit(unit);
-                      setQuantity(1);
-                    }}
-                  >
-                    <View style={styles.unitOptionContent}>
-                      <Text
-                        style={[
-                          styles.unitName,
-                          selectedUnit?._id === unit._id &&
-                            styles.unitNameActive,
-                        ]}
-                      >
-                        {unit.unit_id?.name || "Đơn vị"}
-                        {unit.unit_value > 1 && ` (${unit.unit_value})`}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.unitPrice,
-                          selectedUnit?._id === unit._id &&
-                            styles.unitPriceActive,
-                        ]}
-                      >
-                        {formatPrice(unit.price)}
-                      </Text>
-                    </View>
-                    {selectedUnit?._id === unit._id && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color="#4CAF50"
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
+                {productUnits.map((unit) => {
+                  const unitStock = unit.available_stock || 0;
+                  const isOutOfStock = unitStock === 0;
+
+                  return (
+                    <TouchableOpacity
+                      key={unit._id}
+                      style={[
+                        styles.unitOption,
+                        selectedUnit?._id === unit._id &&
+                          styles.unitOptionActive,
+                        isOutOfStock && styles.unitOptionDisabled,
+                      ]}
+                      onPress={() => {
+                        if (!isOutOfStock) {
+                          setSelectedUnit(unit);
+                          setQuantity(1);
+                        }
+                      }}
+                      disabled={isOutOfStock}
+                    >
+                      <View style={styles.unitOptionContent}>
+                        <View style={styles.unitNameContainer}>
+                          <Text
+                            style={[
+                              styles.unitName,
+                              selectedUnit?._id === unit._id &&
+                                styles.unitNameActive,
+                              isOutOfStock && styles.unitTextDisabled,
+                            ]}
+                          >
+                            {unit.unit_id?.name || "Đơn vị"}
+                            {unit.unit_value > 1 && ` (${unit.unit_value})`}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.unitStock,
+                              isOutOfStock
+                                ? styles.unitStockOut
+                                : styles.unitStockAvailable,
+                            ]}
+                          >
+                            {isOutOfStock ? "Hết hàng" : `Còn ${unitStock}`}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.unitPrice,
+                            selectedUnit?._id === unit._id &&
+                              styles.unitPriceActive,
+                            isOutOfStock && styles.unitTextDisabled,
+                          ]}
+                        >
+                          {formatPrice(unit.price)}
+                        </Text>
+                      </View>
+                      {selectedUnit?._id === unit._id && !isOutOfStock && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={24}
+                          color="#4CAF50"
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           ) : (
@@ -360,17 +408,21 @@ export default function ProductDetailScreen({ navigation, route }) {
                 style={[
                   styles.quantityButton,
                   selectedUnit &&
-                    quantity >= product.total_stock &&
+                    quantity >= (selectedUnit.available_stock || 0) &&
                     styles.quantityButtonDisabled,
                 ]}
                 onPress={increaseQuantity}
-                disabled={!selectedUnit || quantity >= product.total_stock}
+                disabled={
+                  !selectedUnit ||
+                  quantity >= (selectedUnit.available_stock || 0)
+                }
               >
                 <Ionicons
                   name="add"
                   size={20}
                   color={
-                    selectedUnit && quantity >= product.total_stock
+                    selectedUnit &&
+                    quantity >= (selectedUnit.available_stock || 0)
                       ? "#ccc"
                       : "#333"
                   }
@@ -392,9 +444,31 @@ export default function ProductDetailScreen({ navigation, route }) {
               <Text style={styles.detailLabel}>Thuế:</Text>
               <Text style={styles.detailValue}>{product.tax_percentage}%</Text>
             </View>
+            {selectedUnit && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>
+                  Tồn kho ({selectedUnit.unit_id?.name}):
+                </Text>
+                <Text
+                  style={[
+                    styles.detailValue,
+                    {
+                      color:
+                        (selectedUnit.available_stock || 0) === 0
+                          ? "#f44336"
+                          : (selectedUnit.available_stock || 0) < 10
+                            ? "#FF9800"
+                            : "#4CAF50",
+                    },
+                  ]}
+                >
+                  {selectedUnit.available_stock || 0}
+                </Text>
+              </View>
+            )}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Tổng tồn kho:</Text>
-              <Text style={styles.detailValue}>{product.total_stock}</Text>
+              <Text style={styles.detailValue}>{product.total_stock || 0}</Text>
             </View>
           </View>
         </View>
@@ -411,15 +485,19 @@ export default function ProductDetailScreen({ navigation, route }) {
         <TouchableOpacity
           style={[
             styles.addToCartButton,
-            (!selectedUnit || product.total_stock === 0) &&
+            (!selectedUnit || (selectedUnit.available_stock || 0) === 0) &&
               styles.addToCartButtonDisabled,
           ]}
           onPress={handleAddToCart}
-          disabled={!selectedUnit || product.total_stock === 0}
+          disabled={!selectedUnit || (selectedUnit.available_stock || 0) === 0}
         >
           <Ionicons name="cart" size={24} color="#fff" />
           <Text style={styles.addToCartText}>
-            {product.total_stock === 0 ? "Hết hàng" : "Thêm vào giỏ"}
+            {!selectedUnit
+              ? "Chọn đơn vị"
+              : (selectedUnit.available_stock || 0) === 0
+                ? "Hết hàng"
+                : "Thêm vào giỏ"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -575,6 +653,12 @@ const styles = StyleSheet.create({
   },
   unitOptionContent: {
     flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  unitNameContainer: {
+    flex: 1,
   },
   unitName: {
     fontSize: 16,
@@ -585,19 +669,28 @@ const styles = StyleSheet.create({
   unitNameActive: {
     color: "#4CAF50",
   },
-  unitNameDisabled: {
+  unitTextDisabled: {
     color: "#999",
+  },
+  unitStock: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  unitStockAvailable: {
+    color: "#4CAF50",
+  },
+  unitStockOut: {
+    color: "#f44336",
+    fontWeight: "600",
   },
   unitPrice: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#4CAF50",
+    marginLeft: 12,
   },
   unitPriceActive: {
     color: "#2E7D32",
-  },
-  unitPriceDisabled: {
-    color: "#999",
   },
   outOfStockText: {
     fontSize: 12,
