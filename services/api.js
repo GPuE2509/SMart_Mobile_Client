@@ -5,15 +5,14 @@ import { Platform } from "react-native";
 // API Base URL - Automatically detect platform
 // IMPORTANT: For real device, change this IP to your computer's IP address
 // You can find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-const API_HOST = "10.10.10.101"; // Change this to your computer's IP
+const API_HOST = "192.168.1.5"; // ✅ Current WiFi IP - Updated automatically
 
 const getApiBaseUrl = () => {
   if (Platform.OS === "web") {
     return "http://localhost:3000/api/v1";
   } else if (Platform.OS === "android") {
-    // Check if running on emulator or real device
-    // For emulator: use computer IP (not 10.0.2.2 or localhost)
-    return `http://${API_HOST}:3000/api/v1`; // ✅ Use computer IP for emulator
+    // ✅ Works for both emulator and real device on same WiFi
+    return `http://${API_HOST}:3000/api/v1`;
   } else if (Platform.OS === "ios") {
     return `http://${API_HOST}:3000/api/v1`;
   } else {

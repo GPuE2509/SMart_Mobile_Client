@@ -40,7 +40,14 @@ const coupons = [
 
 export default function CartScreen({ navigation }) {
   const { user } = useAuth();
-  const { cartItems, cartTotal, clearCart } = useCart();
+  const {
+    cartItems,
+    cartTotal,
+    clearCart,
+    toggleSelectAll,
+    getSelectedItems,
+    getSelectedCount,
+  } = useCart();
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState("");
@@ -116,9 +123,22 @@ export default function CartScreen({ navigation }) {
   const discount = calculateDiscount();
   const finalTotal = Math.max(0, cartTotal.total - discount);
 
+  const selectedItems = getSelectedItems();
+  const selectedCount = getSelectedCount();
+  const allSelected =
+    cartItems.length > 0 && selectedCount === cartItems.length;
+
   const handleCheckout = () => {
     if (cartItems.length === 0) {
       Alert.alert("Giỏ hàng trống", "Vui lòng thêm sản phẩm vào giỏ hàng");
+      return;
+    }
+
+    if (selectedCount === 0) {
+      Alert.alert(
+        "Chưa chọn sản phẩm",
+        "Vui lòng chọn ít nhất một sản phẩm để thanh toán",
+      );
       return;
     }
 
@@ -135,8 +155,9 @@ export default function CartScreen({ navigation }) {
       return;
     }
 
-    // Navigate to checkout screen with coupon data
+    // Navigate to checkout screen with selected items only
     navigation.navigate("Checkout", {
+      selectedItems,
       couponCode: appliedCoupon?.code || "",
       discount: discount.toString(),
     });
@@ -190,6 +211,23 @@ export default function CartScreen({ navigation }) {
         </View>
       ) : (
         <>
+          {/* Select All Section */}
+          <View style={styles.selectAllContainer}>
+            <TouchableOpacity
+              style={styles.selectAllButton}
+              onPress={toggleSelectAll}
+            >
+              <Ionicons
+                name={allSelected ? "checkbox" : "square-outline"}
+                size={24}
+                color={allSelected ? "#4CAF50" : "#999"}
+              />
+              <Text style={styles.selectAllText}>
+                Chọn tất cả ({selectedCount}/{cartItems.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <FlatList
             data={cartItems}
             keyExtractor={(item) => item.id.toString()}
@@ -275,10 +313,16 @@ export default function CartScreen({ navigation }) {
             </View>
 
             <TouchableOpacity
-              style={styles.checkoutButton}
+              style={[
+                styles.checkoutButton,
+                selectedCount === 0 && styles.checkoutButtonDisabled,
+              ]}
               onPress={handleCheckout}
+              disabled={selectedCount === 0}
             >
-              <Text style={styles.checkoutButtonText}>Thanh toán</Text>
+              <Text style={styles.checkoutButtonText}>
+                Thanh toán ({selectedCount})
+              </Text>
               <Ionicons name="arrow-forward" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -341,6 +385,23 @@ const styles = StyleSheet.create({
   },
   cartList: {
     padding: 16,
+  },
+  selectAllContainer: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  selectAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  selectAllText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
   },
   footer: {
     backgroundColor: "#fff",
@@ -463,6 +524,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginTop: 16,
+  },
+  checkoutButtonDisabled: {
+    backgroundColor: "#ccc",
   },
   checkoutButtonText: {
     color: "#fff",
