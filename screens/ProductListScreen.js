@@ -115,6 +115,10 @@ export default function ProductListScreen({ navigation, route }) {
     setShowFilterModal(false);
   };
 
+  const handleProductPress = (product) => {
+    navigation.navigate("ProductDetail", { productId: product._id });
+  };
+
   const getSortLabel = () => {
     if (sortBy === "name" && sortOrder === "ASC") return "Tên A-Z";
     if (sortBy === "name" && sortOrder === "DESC") return "Tên Z-A";
@@ -194,7 +198,7 @@ export default function ProductListScreen({ navigation, route }) {
         contentContainerStyle={styles.productList}
         renderItem={({ item }) => (
           <View style={styles.productCardWrapper}>
-            <ProductCard product={item} />
+            <ProductCard product={item} onPress={handleProductPress} />
           </View>
         )}
         onEndReached={handleLoadMore}
