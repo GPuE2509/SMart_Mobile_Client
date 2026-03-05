@@ -84,7 +84,7 @@ export default function MainNavigator() {
       <Stack.Screen
         name="Checkout"
         component={CheckoutScreen}
-        options={{ title: "Thanh Toán" }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="OrderSuccess"
