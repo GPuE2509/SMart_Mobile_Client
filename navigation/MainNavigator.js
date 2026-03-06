@@ -4,6 +4,7 @@ import CheckoutScreen from "../screens/CheckoutScreen";
 import OrderSuccessScreen from "../screens/OrderSuccessScreen";
 import OrderHistoryScreen from "../screens/OrderHistoryScreen";
 import CouponScreen from "../screens/CouponScreen";
+import UserCouponsScreen from "../screens/UserCouponsScreen";
 import ChangePasswordScreen from "../screens/ChangePasswordScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import LoginScreen from "../screens/LoginScreen";
@@ -15,6 +16,8 @@ import ResetPasswordNewScreen from "../screens/ResetPasswordNewScreen";
 import ProductListScreen from "../screens/ProductListScreen";
 import ProductDetailScreen from "../screens/ProductDetailScreen";
 import CategoryListScreen from "../screens/CategoryListScreen";
+import RecipeScreen from "../screens/RecipeScreen";
+import RecipeDetailScreen from "../screens/RecipeDetailScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -100,6 +103,21 @@ export default function MainNavigator() {
         name="Coupon"
         component={CouponScreen}
         options={{ title: "Phiếu Giảm Giá" }}
+      />
+      <Stack.Screen
+        name="Recipe"
+        component={RecipeScreen}
+        options={{ title: "Công Thức" }}
+      />
+      <Stack.Screen
+        name="RecipeDetail"
+        component={RecipeDetailScreen}
+        options={{ title: "Chi Tiết Công Thức" }}
+      />
+      <Stack.Screen
+        name="UserCoupons"
+        component={UserCouponsScreen}
+        options={{ title: "Ví Voucher" }}
       />
       <Stack.Screen
         name="ChangePassword"
