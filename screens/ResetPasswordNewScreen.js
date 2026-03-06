@@ -59,7 +59,8 @@ export default function ResetPasswordNewScreen({ navigation, route }) {
         ]
       );
     } catch (error) {
-      Alert.alert('Lỗi', error.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.');
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
     } finally {
       setLoading(false);
     }

@@ -7,23 +7,18 @@ const authService = {
     try {
       const response = await api.post('/auth/signin', { email, password });
       
-      console.log('📡 Signin response:', response.data);
-      
       // Store user data
       if (response.data.user) {
         await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-        console.log('💾 User saved:', response.data.user.email);
       }
       
       // Store token if present in response
       if (response.data.token) {
         await AsyncStorage.setItem('userToken', response.data.token);
-        console.log('🔑 Token saved');
       }
       
       return response.data;
     } catch (error) {
-      console.error('❌ Signin error:', error.message);
       throw error;
     }
   },

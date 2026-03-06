@@ -34,8 +34,7 @@ export default function LoginScreen({ navigation }) {
       // Navigate back to tabs after successful login
       navigation.navigate('MainTabs');
     } catch (error) {
-      console.error('Login failed:', error);
-      const errorMessage = error.response?.data?.message || 'Đăng nhập thất bại';
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Đăng nhập thất bại';
       Alert.alert('Lỗi', errorMessage);
     } finally {
       setLoading(false);

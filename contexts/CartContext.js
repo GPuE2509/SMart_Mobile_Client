@@ -31,7 +31,7 @@ export const CartProvider = ({ children }) => {
         setCartItems(JSON.parse(savedCart));
       }
     } catch (error) {
-      console.error("Error loading cart:", error);
+      // Error loading cart
     }
   };
 
@@ -39,7 +39,7 @@ export const CartProvider = ({ children }) => {
     try {
       await AsyncStorage.setItem("cart", JSON.stringify(cartItems));
     } catch (error) {
-      console.error("Error saving cart:", error);
+      // Error saving cart
     }
   };
 
@@ -52,7 +52,6 @@ export const CartProvider = ({ children }) => {
    */
   const addToCart = (productId, productUnit, product, quantity = 1) => {
     if (!product || !productUnit) {
-      console.error("Product or ProductUnit not found");
       return;
     }
 
@@ -69,12 +68,13 @@ export const CartProvider = ({ children }) => {
             : item,
         );
       } else {
-        // Add new item
+        // Add new item with selected = true by default
         const newItem = {
           id: Date.now(), // Temporary ID for cart item
           product_id: productId,
           product_unit_id: productUnit._id,
           quantity,
+          selected: true, // Default selected
           // Include full details for easy access
           product,
           productUnit,
@@ -129,14 +129,19 @@ export const CartProvider = ({ children }) => {
 
   /**
    * Calculate cart total with tax
+   * @param {boolean} selectedOnly - If true, calculate only for selected items
    */
-  const getCartTotal = () => {
-    const subtotal = cartItems.reduce((total, item) => {
+  const getCartTotal = (selectedOnly = false) => {
+    const items = selectedOnly
+      ? cartItems.filter((item) => item.selected)
+      : cartItems;
+
+    const subtotal = items.reduce((total, item) => {
       return total + item.productUnit.price * item.quantity;
     }, 0);
 
     // Calculate weighted average tax rate
-    const totalTax = cartItems.reduce((total, item) => {
+    const totalTax = items.reduce((total, item) => {
       const itemSubtotal = item.productUnit.price * item.quantity;
       const itemTax = (itemSubtotal * (item.product.tax_percentage || 0)) / 100;
       return total + itemTax;
@@ -149,7 +154,9 @@ export const CartProvider = ({ children }) => {
       taxAmount: totalTax,
       taxRate: averageTaxRate.toFixed(2),
       total: subtotal + totalTax,
-      itemCount: getCartItemCount(),
+      itemCount: selectedOnly
+        ? items.reduce((sum, item) => sum + item.quantity, 0)
+        : getCartItemCount(),
     };
   };
 
@@ -174,6 +181,51 @@ export const CartProvider = ({ children }) => {
     return item ? item.quantity : 0;
   };
 
+  /**
+   * Toggle selection of a cart item
+   * @param {number} cartItemId - Cart item ID
+   */
+  const toggleSelectItem = (cartItemId) => {
+    setCartItems((prevItems) =>
+      prevItems.map((item) =>
+        item.id === cartItemId ? { ...item, selected: !item.selected } : item,
+      ),
+    );
+  };
+
+  /**
+   * Toggle select all items
+   */
+  const toggleSelectAll = () => {
+    const allSelected = cartItems.every((item) => item.selected);
+    setCartItems((prevItems) =>
+      prevItems.map((item) => ({ ...item, selected: !allSelected })),
+    );
+  };
+
+  /**
+   * Get selected items only
+   * @returns {array} Array of selected cart items
+   */
+  const getSelectedItems = () => {
+    return cartItems.filter((item) => item.selected);
+  };
+
+  /**
+   * Remove selected items from cart
+   */
+  const removeSelectedItems = () => {
+    setCartItems((prevItems) => prevItems.filter((item) => !item.selected));
+  };
+
+  /**
+   * Get count of selected items
+   * @returns {number}
+   */
+  const getSelectedCount = () => {
+    return cartItems.filter((item) => item.selected).length;
+  };
+
   const value = {
     cartItems,
     addToCart,
@@ -184,6 +236,11 @@ export const CartProvider = ({ children }) => {
     cartTotal: getCartTotal(),
     isInCart,
     getCartItemQuantity,
+    toggleSelectItem,
+    toggleSelectAll,
+    getSelectedItems,
+    removeSelectedItems,
+    getSelectedCount,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

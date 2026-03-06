@@ -82,7 +82,6 @@ export default function ProductListScreen({ navigation, route }) {
         if (!reset) setPage((prev) => prev + 1);
       }
     } catch (error) {
-      console.error("Error loading products:", error);
       Alert.alert("Lỗi", "Không thể tải danh sách sản phẩm");
       if (reset) setProducts([]);
     } finally {
@@ -114,6 +113,10 @@ export default function ProductListScreen({ navigation, route }) {
     setPriceRange({ min: 0, max: 1000000 });
     setSelectedCategory(null);
     setShowFilterModal(false);
+  };
+
+  const handleProductPress = (product) => {
+    navigation.navigate("ProductDetail", { productId: product._id });
   };
 
   const getSortLabel = () => {
@@ -195,7 +198,7 @@ export default function ProductListScreen({ navigation, route }) {
         contentContainerStyle={styles.productList}
         renderItem={({ item }) => (
           <View style={styles.productCardWrapper}>
-            <ProductCard product={item} />
+            <ProductCard product={item} onPress={handleProductPress} />
           </View>
         )}
         onEndReached={handleLoadMore}

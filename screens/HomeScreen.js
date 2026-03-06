@@ -42,7 +42,6 @@ export default function HomeScreen({ navigation }) {
         setFeaturedProducts(productsRes.data);
       }
     } catch (error) {
-      console.error("Error loading home data:", error);
       Alert.alert("Lỗi", "Không thể tải dữ liệu");
     } finally {
       setLoading(false);

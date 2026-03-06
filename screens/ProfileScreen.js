@@ -46,7 +46,7 @@ export default function ProfileScreen({ navigation }) {
             try {
               await logout();
             } catch (error) {
-              console.error('Logout error:', error);
+              // Logout error handled
             }
           },
         },

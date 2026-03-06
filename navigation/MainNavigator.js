@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import BottomTabNavigator from "./BottomTabNavigator";
 import CheckoutScreen from "../screens/CheckoutScreen";
+import OrderSuccessScreen from "../screens/OrderSuccessScreen";
 import OrderHistoryScreen from "../screens/OrderHistoryScreen";
 import CouponScreen from "../screens/CouponScreen";
 import UserCouponsScreen from "../screens/UserCouponsScreen";
@@ -86,7 +87,12 @@ export default function MainNavigator() {
       <Stack.Screen
         name="Checkout"
         component={CheckoutScreen}
-        options={{ title: "Thanh Toán" }}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="OrderSuccess"
+        component={OrderSuccessScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="OrderHistory"

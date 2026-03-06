@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
         setUser(JSON.parse(savedUser));
       }
     } catch (error) {
-      console.error('Error checking auth:', error);
+      // Error checking auth
     } finally {
       setLoading(false);
     }
@@ -40,17 +40,14 @@ export const AuthProvider = ({ children }) => {
       if (response.user) {
         setUser(response.user);
         await AsyncStorage.setItem('user', JSON.stringify(response.user));
-        console.log('✅ User saved to AsyncStorage:', response.user.email);
       }
       
       if (response.token) {
         await AsyncStorage.setItem('userToken', response.token);
-        console.log('✅ Token saved to AsyncStorage');
       }
       
       return response.user;
     } catch (error) {
-      console.error('❌ Login error in AuthContext:', error);
       throw error;
     }
   };
@@ -60,7 +57,6 @@ export const AuthProvider = ({ children }) => {
       await authService.logout();
       setUser(null);
     } catch (error) {
-      console.error('Logout error:', error);
       // Still clear user on error
       setUser(null);
     }
@@ -74,7 +70,6 @@ export const AuthProvider = ({ children }) => {
       
       return updatedUser;
     } catch (error) {
-      console.error('Update profile error:', error);
       throw error;
     }
   };

@@ -71,7 +71,8 @@ export default function VerifyOTPScreen({ navigation, route }) {
         ]
       );
     } catch (error) {
-      Alert.alert('Lỗi', error.message || 'Xác thực thất bại. Vui lòng thử lại.');
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Xác thực thất bại. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
     } finally {
       setLoading(false);
     }

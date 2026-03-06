@@ -10,7 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCart } from "../contexts/CartContext";
 
 export default function CartItem({ item }) {
-  const { updateQuantity, removeFromCart } = useCart();
+  const { updateQuantity, removeFromCart, toggleSelectItem } = useCart();
 
   const handleRemove = () => {
     Alert.alert("Xóa sản phẩm", "Bạn có chắc muốn xóa sản phẩm này?", [
@@ -43,6 +43,18 @@ export default function CartItem({ item }) {
 
   return (
     <View style={styles.container}>
+      {/* Checkbox */}
+      <TouchableOpacity
+        style={styles.checkbox}
+        onPress={() => toggleSelectItem(item.id)}
+      >
+        <Ionicons
+          name={item.selected ? "checkbox" : "square-outline"}
+          size={24}
+          color={item.selected ? "#4CAF50" : "#999"}
+        />
+      </TouchableOpacity>
+
       <Image source={{ uri: item.product.image_url }} style={styles.image} />
 
       <View style={styles.details}>
@@ -110,6 +122,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  checkbox: {
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
   },
   image: {
     width: 80,
