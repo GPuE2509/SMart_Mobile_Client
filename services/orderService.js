@@ -33,3 +33,11 @@ export const checkPaymentStatus = async (orderId) => {
   const response = await api.get(`/customer/orders/${orderId}/payment-status`);
   return response.data;
 };
+
+// Search/filter products in cart
+export const searchCart = async (filters = {}) => {
+  const response = await api.get("/customer/orders/cart/search", {
+    params: filters,
+  });
+  return response.data;
+};
