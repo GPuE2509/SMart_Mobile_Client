@@ -5,12 +5,16 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  TextInput,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import CartItem from "../components/CartItem";
+import { useState, useMemo } from "react";
 
 export default function CartScreen({ navigation }) {
   const { user } = useAuth();
@@ -22,6 +26,84 @@ export default function CartScreen({ navigation }) {
     getSelectedItems,
     getSelectedCount,
   } = useCart();
+
+  // Search and filter states
+  const [searchText, setSearchText] = useState("");
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [sortBy, setSortBy] = useState("newest");
+
+  // Remove Vietnamese diacritics for search
+  const removeVietnameseDiacritics = (str) => {
+    if (!str) return "";
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase();
+  };
+
+  // Filter and search cart items locally
+  const filteredCartItems = useMemo(() => {
+    let items = [...cartItems];
+
+    // Filter by search text
+    if (searchText.trim()) {
+      const searchNormalized = removeVietnameseDiacritics(searchText);
+      items = items.filter((item) => {
+        const nameNormalized = removeVietnameseDiacritics(
+          item.product?.name || "",
+        );
+        const descNormalized = removeVietnameseDiacritics(
+          item.product?.description || "",
+        );
+        return (
+          nameNormalized.includes(searchNormalized) ||
+          descNormalized.includes(searchNormalized)
+        );
+      });
+    }
+
+    // Sort items
+    switch (sortBy) {
+      case "name":
+        items.sort((a, b) =>
+          (a.product?.name || "").localeCompare(b.product?.name || ""),
+        );
+        break;
+      case "price-asc":
+        items.sort(
+          (a, b) => (a.productUnit?.price || 0) - (b.productUnit?.price || 0),
+        );
+        break;
+      case "price-desc":
+        items.sort(
+          (a, b) => (b.productUnit?.price || 0) - (a.productUnit?.price || 0),
+        );
+        break;
+      case "quantity-asc":
+        items.sort((a, b) => a.quantity - b.quantity);
+        break;
+      case "quantity-desc":
+        items.sort((a, b) => b.quantity - a.quantity);
+        break;
+      case "newest":
+      default:
+        // Keep original order (newest first)
+        break;
+    }
+
+    return items;
+  }, [cartItems, searchText, sortBy]);
+
+  // Check if any filter is active
+  const hasActiveFilters = sortBy !== "newest";
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSortBy("newest");
+    setSearchText("");
+  };
 
   const selectedItems = getSelectedItems();
   const selectedCount = getSelectedCount();
@@ -107,6 +189,75 @@ export default function CartScreen({ navigation }) {
         </View>
       ) : (
         <>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={20} color="#999" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Tìm kiếm trong giỏ hàng..."
+                placeholderTextColor="#999"
+                value={searchText}
+                onChangeText={setSearchText}
+              />
+              {searchText ? (
+                <TouchableOpacity onPress={() => setSearchText("")}>
+                  <Ionicons name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                hasActiveFilters && styles.filterButtonActive,
+              ]}
+              onPress={() => setShowFilterModal(true)}
+            >
+              <Ionicons
+                name="options"
+                size={20}
+                color={hasActiveFilters ? "#fff" : "#4CAF50"}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Active Filters Display */}
+          {hasActiveFilters && (
+            <View style={styles.activeFiltersContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {sortBy !== "newest" && (
+                  <View style={styles.filterTag}>
+                    <Text style={styles.filterTagText}>
+                      {sortBy === "name" && "A-Z"}
+                      {sortBy === "price-asc" && "Giá tăng"}
+                      {sortBy === "price-desc" && "Giá giảm"}
+                      {sortBy === "quantity-asc" && "SL tăng"}
+                      {sortBy === "quantity-desc" && "SL giảm"}
+                    </Text>
+                    <TouchableOpacity onPress={() => setSortBy("newest")}>
+                      <Ionicons name="close" size={16} color="#4CAF50" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={styles.clearFiltersButton}
+                  onPress={clearFilters}
+                >
+                  <Text style={styles.clearFiltersText}>Xóa bộ lọc</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Search Results Info */}
+          {(searchText || hasActiveFilters) && (
+            <View style={styles.searchResultsInfo}>
+              <Text style={styles.searchResultsText}>
+                Tìm thấy {filteredCartItems.length} sản phẩm
+              </Text>
+            </View>
+          )}
+
           {/* Select All Section */}
           <View style={styles.selectAllContainer}>
             <TouchableOpacity
@@ -124,12 +275,22 @@ export default function CartScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          <FlatList
-            data={cartItems}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <CartItem item={item} />}
-            contentContainerStyle={styles.cartList}
-          />
+          {filteredCartItems.length === 0 ? (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="search-outline" size={60} color="#ccc" />
+              <Text style={styles.noResultsText}>Không tìm thấy sản phẩm</Text>
+              <Text style={styles.noResultsSubtext}>
+                Thử tìm kiếm với từ khóa khác
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredCartItems}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => <CartItem item={item} />}
+              contentContainerStyle={styles.cartList}
+            />
+          )}
 
           <View style={styles.footer}>
             {/* Price Summary */}
@@ -167,6 +328,76 @@ export default function CartScreen({ navigation }) {
               <Ionicons name="arrow-forward" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
+
+          {/* Filter Modal */}
+          <Modal
+            visible={showFilterModal}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowFilterModal(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Bộ lọc</Text>
+                  <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                    <Ionicons name="close" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.modalBody}>
+                  {/* Sort Options */}
+                  <Text style={styles.filterLabel}>Sắp xếp theo</Text>
+                  <View style={styles.sortOptionsContainer}>
+                    {[
+                      { value: "newest", label: "Mới nhất" },
+                      { value: "name", label: "Tên A-Z" },
+                      { value: "price-asc", label: "Giá tăng dần" },
+                      { value: "price-desc", label: "Giá giảm dần" },
+                      { value: "quantity-asc", label: "Số lượng tăng" },
+                      { value: "quantity-desc", label: "Số lượng giảm" },
+                    ].map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.sortOption,
+                          sortBy === option.value && styles.sortOptionActive,
+                        ]}
+                        onPress={() => setSortBy(option.value)}
+                      >
+                        <Text
+                          style={[
+                            styles.sortOptionText,
+                            sortBy === option.value &&
+                              styles.sortOptionTextActive,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                <View style={styles.modalFooter}>
+                  <TouchableOpacity
+                    style={styles.clearModalButton}
+                    onPress={() => {
+                      clearFilters();
+                    }}
+                  >
+                    <Text style={styles.clearModalText}>Xóa bộ lọc</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.applyButton}
+                    onPress={() => setShowFilterModal(false)}
+                  >
+                    <Text style={styles.applyButtonText}>Áp dụng</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </>
       )}
     </SafeAreaView>
@@ -296,5 +527,191 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginRight: 8,
+  },
+  // Search and Filter Styles
+  searchContainer: {
+    flexDirection: "row",
+    padding: 12,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  searchInputWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 16,
+    color: "#333",
+  },
+  filterButton: {
+    marginLeft: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterButtonActive: {
+    backgroundColor: "#4CAF50",
+  },
+  activeFiltersContainer: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  filterTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F5E9",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  filterTagText: {
+    color: "#4CAF50",
+    fontSize: 13,
+    fontWeight: "500",
+    marginRight: 4,
+  },
+  clearFiltersButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  clearFiltersText: {
+    color: "#FF5252",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  searchResultsInfo: {
+    backgroundColor: "#f5f5f5",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  searchResultsText: {
+    color: "#666",
+    fontSize: 14,
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  noResultsText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#999",
+    marginTop: 16,
+  },
+  noResultsSubtext: {
+    fontSize: 14,
+    color: "#ccc",
+    marginTop: 8,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  modalBody: {
+    padding: 16,
+  },
+  filterLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  sortOptionsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  sortOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#f5f5f5",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  sortOptionActive: {
+    backgroundColor: "#4CAF50",
+  },
+  sortOptionText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  sortOptionTextActive: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  modalFooter: {
+    flexDirection: "row",
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  clearModalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    alignItems: "center",
+    marginRight: 8,
+  },
+  clearModalText: {
+    fontSize: 16,
+    color: "#666",
+    fontWeight: "600",
+  },
+  applyButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    backgroundColor: "#4CAF50",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  applyButtonText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "600",
   },
 });
