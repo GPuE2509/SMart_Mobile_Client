@@ -328,9 +328,10 @@ export default function CheckoutScreen({ navigation, route }) {
         }
       }
     } catch (error) {
-      console.error("Payment error:", error);
-      // Silent error - just go back to home
-      navigation.navigate("MainTabs", { screen: "HomeTab" });
+      // Clean up the error message if it has "Error: " prefix
+      const cleanMessage = error.message ? error.message.replace(/^Error:\s*/i, '') : "Có lỗi xảy ra khi thanh toán";
+      
+      Alert.alert("Thông báo", cleanMessage);
     } finally {
       setLoading(false);
     }
