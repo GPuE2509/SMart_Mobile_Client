@@ -306,10 +306,37 @@ export default function CheckoutScreen({ navigation, route }) {
 
         const { checkoutUrl } = paymentResponse.data;
 
-        // Step 3: Open PayOS payment page
+        // Step 3: Prompt user not to close the app before opening browser
+        const userAgreed = await new Promise((resolve) => {
+          Alert.alert(
+            "Lưu ý rất quan trọng!",
+            "Tuyệt đối KHÔNG được tắt App trong quá trình quét QR.\n\nSau khi chuyển khoản thành công, nhớ trở lại đây để hệ thống chốt đơn hàng nhanh nhất.",
+            [
+              {
+                text: "Hủy thanh toán",
+                style: "cancel",
+                onPress: () => resolve(false),
+              },
+              {
+                text: "Đã hiểu, Quét mã",
+                onPress: () => resolve(true),
+              },
+            ],
+            { cancelable: false }
+          );
+        });
+
+        if (!userAgreed) {
+          // If they cancel here, the order was already created in "unpaid" state,
+          // so we navigate them to home or orders. The 15 min cronjob will clean it up.
+          navigation.navigate("MainTabs", { screen: "HomeTab" });
+          return;
+        }
+
+        // Step 4: Open PayOS payment page
         await WebBrowser.openBrowserAsync(checkoutUrl);
 
-        // Step 4: After browser closes, ALWAYS check payment status
+        // Step 5: After browser closes, ALWAYS check payment status
         setTimeout(async () => {
           await checkAndHandlePaymentStatus(order._id);
         }, 1000);
@@ -330,7 +357,7 @@ export default function CheckoutScreen({ navigation, route }) {
     } catch (error) {
       // Clean up the error message if it has "Error: " prefix
       const cleanMessage = error.message ? error.message.replace(/^Error:\s*/i, '') : "Có lỗi xảy ra khi thanh toán";
-      
+
       Alert.alert("Thông báo", cleanMessage);
     } finally {
       setLoading(false);
