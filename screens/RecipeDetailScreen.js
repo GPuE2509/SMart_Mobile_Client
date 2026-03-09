@@ -130,8 +130,8 @@ export default function RecipeDetailScreen({ route }) {
             <Text style={styles.sectionTitle}>Nguyên liệu</Text>
             {recipe.ingredients && recipe.ingredients.length > 0 ? (
               <>
-                {recipe.ingredients.map((ing) => (
-                  <View key={ing._id} style={styles.ingredientRow}>
+                {recipe.ingredients.map((ing, index) => (
+                  <View key={`${ing._id}-${index}`} style={styles.ingredientRow}>
                     <View style={styles.ingredientBullet} />
                     <View style={styles.ingredientTextContainer}>
                       <Text style={styles.ingredientName}>

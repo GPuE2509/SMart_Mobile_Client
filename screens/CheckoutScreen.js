@@ -9,6 +9,8 @@ import {
   TextInput,
   Image,
   Alert,
+  Modal,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,30 +24,7 @@ import {
   getOrderById,
 } from "../services/orderService";
 import profileService from "../services/profileService";
-
-// Mock coupons data
-const coupons = [
-  {
-    code: "WELCOME10",
-    description: "Giảm 10% cho đơn hàng đầu tiên",
-    discount_type: "percent",
-    discount_value: 10,
-    min_order_value: 100000,
-    max_discount_amount: 50000,
-    status: "active",
-    end_date: "2026-12-31",
-  },
-  {
-    code: "SAVE50K",
-    description: "Giảm 50.000đ cho đơn từ 500.000đ",
-    discount_type: "fixed_amount",
-    discount_value: 50000,
-    min_order_value: 500000,
-    max_discount_amount: 50000,
-    status: "active",
-    end_date: "2026-12-31",
-  },
-];
+import userCouponService from "../services/userCouponService";
 
 export default function CheckoutScreen({ navigation, route }) {
   const { user } = useAuth();
@@ -54,9 +33,11 @@ export default function CheckoutScreen({ navigation, route }) {
 
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("payos");
-  const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState("");
+  const [userCoupons, setUserCoupons] = useState([]);
+  const [showCouponPicker, setShowCouponPicker] = useState(false);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
 
   // Address state
   const [address, setAddress] = useState({
@@ -106,89 +87,119 @@ export default function CheckoutScreen({ navigation, route }) {
     }
   }, [user]);
 
-  const handleApplyCoupon = () => {
-    if (!couponCode.trim()) {
-      setCouponError("Vui lòng nhập mã giảm giá");
-      return;
-    }
+  // Load user's available coupons
+  useEffect(() => {
+    const loadUserCoupons = async () => {
+      if (!user) return;
+      
+      setLoadingCoupons(true);
+      try {
+        const response = await userCouponService.getMyCoupons({ is_used: false });
+        if (response.success && response.data) {
+          setUserCoupons(response.data);
+        }
+      } catch (error) {
+        console.error("Failed to load user coupons:", error);
+      } finally {
+        setLoadingCoupons(false);
+      }
+    };
 
-    // Find coupon
-    const coupon = coupons.find(
-      (c) =>
-        c.code.toLowerCase() === couponCode.trim().toLowerCase() &&
-        c.status === "active",
-    );
+    loadUserCoupons();
+  }, [user]);
 
-    if (!coupon) {
-      setCouponError("Mã giảm giá không hợp lệ");
-      setAppliedCoupon(null);
-      return;
-    }
-
-    // Check if coupon has expired
-    const now = new Date();
-    const endDate = new Date(coupon.end_date);
-    if (now > endDate) {
-      setCouponError("Mã giảm giá đã hết hạn");
-      setAppliedCoupon(null);
-      return;
-    }
-
-    // Check minimum order value
-    const subtotal = calculateTotal().subtotal;
-    if (subtotal < coupon.min_order_value) {
-      setCouponError(
-        `Đơn hàng tối thiểu ${coupon.min_order_value.toLocaleString("vi-VN")}đ`,
+  const handleSelectCoupon = async (coupon) => {
+    setShowCouponPicker(false);
+    setLoading(true);
+    
+    try {
+      const subtotal = calculateTotal().subtotal;
+      const response = await userCouponService.validateCoupon(
+        coupon.coupon_id.code,
+        subtotal
       );
-      setAppliedCoupon(null);
-      return;
-    }
 
-    // Apply coupon
-    setAppliedCoupon(coupon);
-    setCouponError("");
-    Alert.alert("Thành công", `Đã áp dụng mã giảm giá: ${coupon.code}`);
+      if (!response.success) {
+        setCouponError(response.message || "Mã giảm giá không hợp lệ");
+        setAppliedCoupon(null);
+        setLoading(false);
+        return;
+      }
+
+      // Apply coupon
+      const validatedCoupon = {
+        ...response.data.coupon,
+        discount: response.data.discount,
+      };
+      setAppliedCoupon(validatedCoupon);
+      setCouponError("");
+      Alert.alert(
+        "Thành công",
+        `Đã áp dụng mã giảm giá: ${coupon.coupon_id.code}`
+      );
+    } catch (error) {
+      console.error("Failed to validate coupon:", error);
+      setCouponError("Không thể xác thực mã giảm giá. Vui lòng thử lại.");
+      setAppliedCoupon(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
-    setCouponCode("");
     setCouponError("");
   };
 
   // Calculate discount
   const calculateDiscount = () => {
-    if (!appliedCoupon) return 0;
-
-    const subtotal = calculateTotal().subtotal;
-    let discount = 0;
-    if (appliedCoupon.discount_type === "percent") {
-      discount = (subtotal * appliedCoupon.discount_value) / 100;
-      // Apply max discount limit
-      if (discount > appliedCoupon.max_discount_amount) {
-        discount = appliedCoupon.max_discount_amount;
-      }
-    } else {
-      // fixed_amount
-      discount = appliedCoupon.discount_value;
-    }
-
-    return Math.min(discount, subtotal); // Don't discount more than subtotal
+    if (!appliedCoupon || !appliedCoupon.discount) return 0;
+    
+    // Use the discount amount already validated by backend
+    return Math.round(appliedCoupon.discount);
   };
 
   // Calculate total from selected items only
   const calculateTotal = () => {
     if (!selectedItems || selectedItems.length === 0) {
-      return { subtotal: 0, taxAmount: 0, total: 0, itemCount: 0 };
+      return { 
+        originalSubtotal: 0, 
+        rescueSavings: 0, 
+        subtotal: 0, 
+        taxAmount: 0, 
+        total: 0, 
+        itemCount: 0 
+      };
     }
 
+    let originalSubtotal = 0;
+    let rescueSavings = 0;
+
     const subtotal = selectedItems.reduce((total, item) => {
-      return total + item.productUnit.price * item.quantity;
+      // Use rescue pricing if available
+      const hasRescue = item.rescuePricing?.isAvailable;
+      const price = hasRescue 
+        ? item.rescuePricing.discountedPrice 
+        : item.productUnit.price;
+      
+      const originalPrice = item.productUnit.price;
+      originalSubtotal += originalPrice * item.quantity;
+      
+      if (hasRescue) {
+        rescueSavings += item.rescuePricing.savings || 0;
+      }
+      
+      return total + price * item.quantity;
     }, 0);
 
     const taxAmount = selectedItems.reduce((total, item) => {
-      const itemSubtotal = item.productUnit.price * item.quantity;
-      const itemTax = (itemSubtotal * (item.product.tax_percentage || 0)) / 100;
+      // Tax is calculated on discounted price if rescue pricing applies
+      const hasRescue = item.rescuePricing?.isAvailable;
+      const price = hasRescue 
+        ? item.rescuePricing.discountedPrice 
+        : item.productUnit.price;
+      const itemSubtotal = price * item.quantity;
+      const itemTax = Math.round((itemSubtotal * (item.product.tax_percentage || 0)) / 100);
       return total + itemTax;
     }, 0);
 
@@ -198,9 +209,11 @@ export default function CheckoutScreen({ navigation, route }) {
     );
 
     return {
-      subtotal,
-      taxAmount,
-      total: subtotal + taxAmount,
+      originalSubtotal: Math.round(originalSubtotal),
+      rescueSavings: Math.round(rescueSavings),
+      subtotal: Math.round(subtotal),
+      taxAmount: Math.round(taxAmount),
+      total: Math.round(subtotal + taxAmount),
       itemCount,
     };
   };
@@ -414,29 +427,54 @@ export default function CheckoutScreen({ navigation, route }) {
         {/* Products List */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sản phẩm đã chọn</Text>
-          {selectedItems?.map((item) => (
-            <View key={item.id} style={styles.productItem}>
-              <Image
-                source={{
-                  uri:
-                    item.product.image_url || "https://via.placeholder.com/80",
-                }}
-                style={styles.productImage}
-              />
-              <View style={styles.productInfo}>
-                <Text style={styles.productName} numberOfLines={2}>
-                  {item.product.name}
-                </Text>
-                <Text style={styles.productUnit}>Đơn vị: {item.unit.name}</Text>
-                <View style={styles.productPriceRow}>
-                  <Text style={styles.productPrice}>
-                    {item.productUnit.price.toLocaleString("vi-VN")}đ
+          {selectedItems?.map((item, index) => {
+            const hasRescue = item.rescuePricing?.isAvailable;
+            const displayPrice = hasRescue 
+              ? item.rescuePricing.discountedPrice 
+              : item.productUnit.price;
+            
+            return (
+              <View key={`${item.id}-${index}`} style={styles.productItem}>
+                <Image
+                  source={{
+                    uri:
+                      item.product.image_url || "https://via.placeholder.com/80",
+                  }}
+                  style={styles.productImage}
+                />
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName} numberOfLines={2}>
+                    {item.product.name}
                   </Text>
-                  <Text style={styles.productQuantity}>x{item.quantity}</Text>
+                  <Text style={styles.productUnit}>Đơn vị: {item.unit.name}</Text>
+                  <View style={styles.productPriceRow}>
+                    {hasRescue ? (
+                      <View style={styles.priceWithRescue}>
+                        <Text style={styles.originalPrice}>
+                          {item.productUnit.price.toLocaleString("vi-VN")}đ
+                        </Text>
+                        <View style={styles.rescuePriceContainer}>
+                          <Text style={styles.rescuePrice}>
+                            {displayPrice.toLocaleString("vi-VN")}đ
+                          </Text>
+                          <View style={styles.rescueBadge}>
+                            <Text style={styles.rescueBadgeText}>
+                              -{item.rescuePricing.discountPercentage}%
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    ) : (
+                      <Text style={styles.productPrice}>
+                        {item.productUnit.price.toLocaleString("vi-VN")}đ
+                      </Text>
+                    )}
+                    <Text style={styles.productQuantity}>x{item.quantity}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Shipping Address */}
@@ -649,24 +687,16 @@ export default function CheckoutScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.couponInputContainer}>
-              <TextInput
-                style={styles.couponInput}
-                placeholder="Nhập mã giảm giá"
-                value={couponCode}
-                onChangeText={(text) => {
-                  setCouponCode(text);
-                  setCouponError("");
-                }}
-                autoCapitalize="characters"
-              />
-              <TouchableOpacity
-                style={styles.applyButton}
-                onPress={handleApplyCoupon}
-              >
-                <Text style={styles.applyButtonText}>Áp dụng</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.selectCouponButton}
+              onPress={() => setShowCouponPicker(true)}
+            >
+              <Ionicons name="pricetag-outline" size={20} color="#4CAF50" />
+              <Text style={styles.selectCouponText}>
+                Chọn mã giảm giá ({userCoupons.length} khả dụng)
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
           )}
           {couponError ? (
             <Text style={styles.couponError}>{couponError}</Text>
@@ -682,6 +712,24 @@ export default function CheckoutScreen({ navigation, route }) {
               {selectedItems?.length || 0}
             </Text>
           </View>
+          {cartTotal.rescueSavings > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Giá gốc:</Text>
+              <Text style={styles.summaryValue}>
+                {cartTotal.originalSubtotal.toLocaleString("vi-VN")}đ
+              </Text>
+            </View>
+          )}
+          {cartTotal.rescueSavings > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, styles.rescueLabel]}>
+                🌟 Chương trình giảm giá:
+              </Text>
+              <Text style={[styles.summaryValue, styles.rescueValue]}>
+                -{cartTotal.rescueSavings.toLocaleString("vi-VN")}đ
+              </Text>
+            </View>
+          )}
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Tạm tính:</Text>
             <Text style={styles.summaryValue}>
@@ -696,7 +744,7 @@ export default function CheckoutScreen({ navigation, route }) {
           </View>
           {discountAmount > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={styles.discountLabel}>Giảm giá:</Text>
+              <Text style={styles.discountLabel}>Giảm giá coupon:</Text>
               <Text style={styles.discountValue}>
                 -{discountAmount.toLocaleString("vi-VN")}đ
               </Text>
@@ -790,6 +838,108 @@ export default function CheckoutScreen({ navigation, route }) {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Coupon Picker Modal */}
+      <Modal
+        visible={showCouponPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCouponPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn mã giảm giá</Text>
+              <TouchableOpacity onPress={() => setShowCouponPicker(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            {loadingCoupons ? (
+              <View style={styles.modalLoading}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+              </View>
+            ) : userCoupons.length === 0 ? (
+              <View style={styles.noCouponsContainer}>
+                <Ionicons name="pricetag-outline" size={64} color="#ccc" />
+                <Text style={styles.noCouponsText}>
+                  Bạn chưa có mã giảm giá nào
+                </Text>
+                <Text style={styles.noCouponsSubtext}>
+                  Đổi điểm để nhận mã giảm giá
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={userCoupons}
+                keyExtractor={(item) => item._id}
+                renderItem={({ item }) => {
+                  const coupon = item.coupon_id;
+                  const subtotal = calculateTotal().subtotal;
+                  const isEligible = subtotal >= coupon.min_order_value;
+                  const now = new Date();
+                  const isExpired = now > new Date(coupon.end_date);
+
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.couponItem,
+                        (!isEligible || isExpired) && styles.couponItemDisabled,
+                      ]}
+                      onPress={() => {
+                        if (isEligible && !isExpired) {
+                          handleSelectCoupon(item);
+                        } else if (!isEligible) {
+                          Alert.alert(
+                            "Không đủ điều kiện",
+                            `Đơn hàng tối thiểu ${coupon.min_order_value.toLocaleString("vi-VN")}đ`
+                          );
+                        } else {
+                          Alert.alert("Hết hạn", "Mã giảm giá đã hết hạn");
+                        }
+                      }}
+                      disabled={!isEligible || isExpired}
+                    >
+                      <View style={styles.couponItemLeft}>
+                        <Ionicons
+                          name="pricetag"
+                          size={24}
+                          color={isEligible && !isExpired ? "#4CAF50" : "#999"}
+                        />
+                        <View style={styles.couponItemInfo}>
+                          <Text style={styles.couponItemCode}>
+                            {coupon.code}
+                          </Text>
+                          <Text style={styles.couponItemDesc} numberOfLines={2}>
+                            {coupon.description}
+                          </Text>
+                          <Text style={styles.couponItemCondition}>
+                            Đơn tối thiểu:{" "}
+                            {coupon.min_order_value.toLocaleString("vi-VN")}đ
+                          </Text>
+                        </View>
+                      </View>
+                      {!isEligible && (
+                        <View style={styles.couponBadge}>
+                          <Text style={styles.couponBadgeText}>
+                            Chưa đủ điều kiện
+                          </Text>
+                        </View>
+                      )}
+                      {isExpired && (
+                        <View style={[styles.couponBadge, styles.couponBadgeExpired]}>
+                          <Text style={styles.couponBadgeText}>Hết hạn</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+                contentContainerStyle={styles.couponList}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -841,6 +991,14 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 14,
     color: "#333",
+  },
+  rescueLabel: {
+    color: "#FF6B00",
+    fontWeight: "600",
+  },
+  rescueValue: {
+    color: "#FF6B00",
+    fontWeight: "700",
   },
   discountLabel: {
     fontSize: 14,
@@ -957,6 +1115,36 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  priceWithRescue: {
+    flexDirection: "column",
+  },
+  originalPrice: {
+    fontSize: 11,
+    color: "#999",
+    textDecorationLine: "line-through",
+    marginBottom: 2,
+  },
+  rescuePriceContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  rescuePrice: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#FF6B00",
+  },
+  rescueBadge: {
+    backgroundColor: "#FF6B00",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  rescueBadgeText: {
+    fontSize: 9,
+    color: "#fff",
+    fontWeight: "700",
+  },
   productPrice: {
     fontSize: 14,
     fontWeight: "bold",
@@ -965,6 +1153,22 @@ const styles = StyleSheet.create({
   productQuantity: {
     fontSize: 14,
     color: "#666",
+  },
+  selectCouponButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  selectCouponText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#333",
+    marginLeft: 10,
   },
   couponInputContainer: {
     flexDirection: "row",
@@ -1024,6 +1228,114 @@ const styles = StyleSheet.create({
     color: "#f44336",
     fontSize: 12,
     marginTop: 8,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  modalLoading: {
+    padding: 40,
+    alignItems: "center",
+  },
+  noCouponsContainer: {
+    padding: 40,
+    alignItems: "center",
+  },
+  noCouponsText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#999",
+    marginTop: 16,
+  },
+  noCouponsSubtext: {
+    fontSize: 14,
+    color: "#ccc",
+    marginTop: 8,
+  },
+  couponList: {
+    padding: 16,
+  },
+  couponItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  couponItemDisabled: {
+    borderColor: "#ddd",
+    backgroundColor: "#f5f5f5",
+    opacity: 0.6,
+  },
+  couponItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  couponItemInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  couponItemCode: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#4CAF50",
+  },
+  couponItemDesc: {
+    fontSize: 13,
+    color: "#666",
+    marginTop: 4,
+  },
+  couponItemCondition: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 4,
+  },
+  couponBadge: {
+    backgroundColor: "#ff9800",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  couponBadgeExpired: {
+    backgroundColor: "#f44336",
+  },
+  couponBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
   },
   inputGroup: {
     marginBottom: 16,

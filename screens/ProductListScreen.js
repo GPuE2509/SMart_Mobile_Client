@@ -75,7 +75,12 @@ export default function ProductListScreen({ navigation, route }) {
           setProducts(newProducts);
           setPage(1);
         } else {
-          setProducts((prev) => [...prev, ...newProducts]);
+          // Prevent duplicates by filtering out products that already exist
+          setProducts((prev) => {
+            const existingIds = new Set(prev.map(p => p._id));
+            const uniqueNew = newProducts.filter(p => !existingIds.has(p._id));
+            return [...prev, ...uniqueNew];
+          });
         }
 
         setHasMore(paginationData.page < paginationData.totalPages);

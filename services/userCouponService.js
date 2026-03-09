@@ -28,6 +28,27 @@ const userCouponService = {
       throw error;
     }
   },
+
+  /**
+   * Validate a coupon code for checkout
+   * @param {string} couponCode
+   * @param {number} orderAmount
+   */
+  validateCoupon: async (couponCode, orderAmount) => {
+    try {
+      const response = await api.post("/customer/user-coupons/validate", {
+        coupon_code: couponCode,
+        order_amount: orderAmount,
+      });
+      return response.data;
+    } catch (error) {
+      // Handle validation errors (HTTP 400)
+      if (error.response && error.response.status === 400) {
+        return error.response.data;
+      }
+      throw error;
+    }
+  },
 };
 
 export default userCouponService;

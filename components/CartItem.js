@@ -35,7 +35,12 @@ export default function CartItem({ item }) {
     }
   };
 
-  const subtotal = item.productUnit.price * item.quantity;
+  // Check if item has rescue pricing
+  const hasRescue = item.rescuePricing?.isAvailable;
+  const displayPrice = hasRescue 
+    ? item.rescuePricing.discountedPrice 
+    : item.productUnit.price;
+  const subtotal = displayPrice * item.quantity;
 
   // Get unit name from populated unit_id or fallback to 'đơn vị'
   const unitName =
@@ -72,9 +77,29 @@ export default function CartItem({ item }) {
             )}
         </View>
 
-        <Text style={styles.price}>
-          {item.productUnit.price.toLocaleString("vi-VN")}đ / {unitName}
-        </Text>
+        <View style={styles.priceContainer}>
+          {hasRescue ? (
+            <>
+              <Text style={styles.originalPrice}>
+                {item.productUnit.price.toLocaleString("vi-VN")}đ
+              </Text>
+              <View style={styles.rescuePriceRow}>
+                <Text style={styles.rescuePrice}>
+                  {displayPrice.toLocaleString("vi-VN")}đ / {unitName}
+                </Text>
+                <View style={styles.rescueBadge}>
+                  <Text style={styles.rescueBadgeText}>
+                    -{item.rescuePricing.discountPercentage}%
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.price}>
+              {item.productUnit.price.toLocaleString("vi-VN")}đ / {unitName}
+            </Text>
+          )}
+        </View>
 
         <View style={styles.footer}>
           <View style={styles.quantityControl}>
@@ -159,11 +184,40 @@ const styles = StyleSheet.create({
     color: "#999",
     marginLeft: 4,
   },
+  priceContainer: {
+    marginBottom: 8,
+  },
   price: {
     fontSize: 14,
     color: "#4CAF50",
     fontWeight: "500",
-    marginBottom: 8,
+  },
+  originalPrice: {
+    fontSize: 12,
+    color: "#999",
+    textDecorationLine: "line-through",
+    marginBottom: 2,
+  },
+  rescuePriceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  rescuePrice: {
+    fontSize: 14,
+    color: "#FF6B00",
+    fontWeight: "600",
+  },
+  rescueBadge: {
+    backgroundColor: "#FF6B00",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  rescueBadgeText: {
+    fontSize: 10,
+    color: "#fff",
+    fontWeight: "700",
   },
   footer: {
     flexDirection: "row",
