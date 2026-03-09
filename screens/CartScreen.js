@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import CartItem from "../components/CartItem";
-import { useState, useMemo } from "react";
 
 export default function CartScreen({ navigation }) {
   const { user } = useAuth();

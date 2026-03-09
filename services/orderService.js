@@ -34,10 +34,35 @@ export const checkPaymentStatus = async (orderId) => {
   return response.data;
 };
 
-// Search/filter products in cart
-export const searchCart = async (filters = {}) => {
-  const response = await api.get("/customer/orders/cart/search", {
-    params: filters,
+// ================= CART APIs =================
+
+export const getCart = async () => {
+  const response = await api.get("/customer/cart");
+  return response.data;
+};
+
+export const addToCart = async (productUnitId, quantity = 1) => {
+  const response = await api.post("/customer/cart/add", {
+    productUnitId,
+    quantity,
   });
   return response.data;
 };
+
+export const updateCartQuantity = async (cartItemId, quantity) => {
+  const response = await api.put(`/customer/cart/update/${cartItemId}`, {
+    quantity,
+  });
+  return response.data;
+};
+
+export const removeFromCart = async (cartItemId) => {
+  const response = await api.delete(`/customer/cart/remove/${cartItemId}`);
+  return response.data;
+};
+
+export const clearCart = async () => {
+  const response = await api.delete("/customer/cart/clear");
+  return response.data;
+};
+

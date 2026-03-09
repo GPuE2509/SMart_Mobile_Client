@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as orderService from "../services/orderService";
+import { useAuth } from "./AuthContext";
+import { Alert } from "react-native";
 
 const CartContext = createContext();
 
@@ -13,137 +16,164 @@ export const useCart = () => {
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth(); // Monitor login state
 
-  // Load cart from AsyncStorage on mount
+  // Load cart whenever user logs in or app mounts
   useEffect(() => {
-    loadCart();
-  }, []);
-
-  // Save cart to AsyncStorage whenever it changes
-  useEffect(() => {
-    saveCart();
-  }, [cartItems]);
-
-  const loadCart = async () => {
-    try {
-      const savedCart = await AsyncStorage.getItem("cart");
-      if (savedCart) {
-        setCartItems(JSON.parse(savedCart));
-      }
-    } catch (error) {
-      // Error loading cart
+    if (user) {
+      loadCartAPI();
+    } else {
+      setCartItems([]); // Clear local state if logged out
     }
-  };
+  }, [user]);
 
-  const saveCart = async () => {
+  /**
+   * Fetch cart from database
+   */
+  const loadCartAPI = async () => {
     try {
-      await AsyncStorage.setItem("cart", JSON.stringify(cartItems));
+      setIsLoading(true);
+      const data = await orderService.getCart();
+      
+      // Inject "selected" property since the backend doesn't track UI selection status
+      const mappedItems = (data.data || []).map(item => ({
+        ...item,
+        id: item._id, // Map for UI compatibility
+        selected: true
+      }));
+      setCartItems(mappedItems);
     } catch (error) {
-      // Error saving cart
+      console.error("Error loading cart from DB:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   /**
-   * Add item to cart or update quantity if already exists
-   * @param {string} productId - Product ID
-   * @param {object} productUnit - Product Unit object with price and unit_id
-   * @param {object} product - Product object with full details
-   * @param {number} quantity - Quantity to add
+   * Add item to cart online
    */
-  const addToCart = (productId, productUnit, product, quantity = 1) => {
-    if (!product || !productUnit) {
+  const addToCart = async (productId, productUnit, product, quantity = 1) => {
+    if (!user) {
+      Alert.alert("Yêu cầu", "Vui lòng đăng nhập để thêm vào giỏ hàng!");
       return;
     }
 
-    setCartItems((prevItems) => {
-      const existingItem = prevItems.find(
-        (item) => item.product_unit_id === productUnit._id,
-      );
-
-      if (existingItem) {
-        // Update quantity if item already exists
-        return prevItems.map((item) =>
-          item.product_unit_id === productUnit._id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item,
-        );
-      } else {
-        // Add new item with selected = true by default
-        const newItem = {
-          id: Date.now(), // Temporary ID for cart item
-          product_id: productId,
-          product_unit_id: productUnit._id,
-          quantity,
-          selected: true, // Default selected
-          // Include full details for easy access
-          product,
-          productUnit,
-          unit: productUnit.unit_id, // Unit info is populated in productUnit
-        };
-        return [...prevItems, newItem];
-      }
-    });
+    try {
+      setIsLoading(true);
+      await orderService.addToCart(productUnit._id, quantity);
+      await loadCartAPI(); // Reload from server to get accurate IDs and sync
+    } catch (error) {
+      console.error("Add to cart error:", error);
+      Alert.alert("Lỗi", "Không thể thêm vào giỏ hàng");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   /**
-   * Remove item from cart
-   * @param {number} cartItemId - Cart item ID
+   * Remove item from online cart
    */
-  const removeFromCart = (cartItemId) => {
-    setCartItems((prevItems) =>
-      prevItems.filter((item) => item.id !== cartItemId),
-    );
+  const removeFromCart = async (cartItemId) => {
+    try {
+      setIsLoading(true);
+      await orderService.removeFromCart(cartItemId);
+      // Optimistic update for speedy UI
+      setCartItems((prev) => prev.filter((item) => item.id !== cartItemId));
+    } catch (error) {
+      console.error("Remove from cart error:", error);
+      await loadCartAPI(); // Revert on failure
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   /**
-   * Update quantity of a cart item
-   * @param {number} cartItemId - Cart item ID
-   * @param {number} newQuantity - New quantity
+   * Update quantity online
    */
-  const updateQuantity = (cartItemId, newQuantity) => {
+  const updateQuantity = async (cartItemId, newQuantity) => {
     if (newQuantity <= 0) {
-      removeFromCart(cartItemId);
-      return;
+      return removeFromCart(cartItemId);
     }
 
+    try {
+      // Optimistic update
+      setCartItems((prev) =>
+        prev.map((item) =>
+          item.id === cartItemId ? { ...item, quantity: newQuantity } : item
+        )
+      );
+      await orderService.updateCartQuantity(cartItemId, newQuantity);
+    } catch (error) {
+      console.error("Update quantity error:", error);
+      await loadCartAPI(); // Revert to server state on failure
+    }
+  };
+
+  /**
+   * Clear all items from online cart
+   */
+  const clearCart = async () => {
+    try {
+      setIsLoading(true);
+      await orderService.clearCart();
+      setCartItems([]);
+    } catch (error) {
+      console.error("Clear cart error:", error);
+      await loadCartAPI();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Selection Toggles (Local UI only)
+   */
+  const toggleSelectItem = (cartItemId) => {
     setCartItems((prevItems) =>
       prevItems.map((item) =>
-        item.id === cartItemId ? { ...item, quantity: newQuantity } : item,
-      ),
+        item.id === cartItemId ? { ...item, selected: !item.selected } : item
+      )
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = cartItems.every((item) => item.selected);
+    setCartItems((prevItems) =>
+      prevItems.map((item) => ({ ...item, selected: !allSelected }))
     );
   };
 
   /**
-   * Clear all items from cart
-   */
-  const clearCart = () => {
-    setCartItems([]);
-  };
-
-  /**
-   * Get cart item count (total number of items)
+   * Getters
    */
   const getCartItemCount = () => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
-  /**
-   * Calculate cart total with tax
-   * @param {boolean} selectedOnly - If true, calculate only for selected items
-   */
+  const getSelectedCount = () => {
+    return cartItems.filter((item) => item.selected).length;
+  };
+
+  const getSelectedItems = () => {
+    return cartItems.filter((item) => item.selected);
+  };
+
   const getCartTotal = (selectedOnly = false) => {
     const items = selectedOnly
       ? cartItems.filter((item) => item.selected)
       : cartItems;
 
     const subtotal = items.reduce((total, item) => {
-      return total + item.productUnit.price * item.quantity;
+      // Safety check in case productUnit fails to populate
+      const price = item.productUnit?.price || 0;
+      return total + price * item.quantity;
     }, 0);
 
-    // Calculate weighted average tax rate
     const totalTax = items.reduce((total, item) => {
-      const itemSubtotal = item.productUnit.price * item.quantity;
-      const itemTax = (itemSubtotal * (item.product.tax_percentage || 0)) / 100;
+      const price = item.productUnit?.price || 0;
+      const taxPercent = item.product?.tax_percentage || 0;
+      const itemTax = (price * item.quantity * taxPercent) / 100;
       return total + itemTax;
     }, 0);
 
@@ -160,74 +190,25 @@ export const CartProvider = ({ children }) => {
     };
   };
 
-  /**
-   * Check if a product unit is in cart
-   * @param {string} productUnitId
-   * @returns {boolean}
-   */
   const isInCart = (productUnitId) => {
     return cartItems.some((item) => item.product_unit_id === productUnitId);
   };
 
-  /**
-   * Get quantity of a product unit in cart
-   * @param {string} productUnitId
-   * @returns {number}
-   */
   const getCartItemQuantity = (productUnitId) => {
-    const item = cartItems.find(
-      (item) => item.product_unit_id === productUnitId,
-    );
+    const item = cartItems.find((item) => item.product_unit_id === productUnitId);
     return item ? item.quantity : 0;
   };
 
-  /**
-   * Toggle selection of a cart item
-   * @param {number} cartItemId - Cart item ID
-   */
-  const toggleSelectItem = (cartItemId) => {
-    setCartItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === cartItemId ? { ...item, selected: !item.selected } : item,
-      ),
-    );
-  };
-
-  /**
-   * Toggle select all items
-   */
-  const toggleSelectAll = () => {
-    const allSelected = cartItems.every((item) => item.selected);
-    setCartItems((prevItems) =>
-      prevItems.map((item) => ({ ...item, selected: !allSelected })),
-    );
-  };
-
-  /**
-   * Get selected items only
-   * @returns {array} Array of selected cart items
-   */
-  const getSelectedItems = () => {
-    return cartItems.filter((item) => item.selected);
-  };
-
-  /**
-   * Remove selected items from cart
-   */
-  const removeSelectedItems = () => {
-    setCartItems((prevItems) => prevItems.filter((item) => !item.selected));
-  };
-
-  /**
-   * Get count of selected items
-   * @returns {number}
-   */
-  const getSelectedCount = () => {
-    return cartItems.filter((item) => item.selected).length;
+  const removeSelectedItems = async () => {
+    const selected = getSelectedItems();
+    for (const item of selected) {
+        await removeFromCart(item.id);
+    }
   };
 
   const value = {
     cartItems,
+    isLoading, // Export loading state in case UI wants a spinner
     addToCart,
     removeFromCart,
     updateQuantity,
