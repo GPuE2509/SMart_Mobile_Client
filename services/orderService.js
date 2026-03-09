@@ -20,12 +20,20 @@ export const getOrderById = async (orderId) => {
   return response.data;
 };
 
-// Get user orders
-export const getUserOrders = async (page = 1, limit = 10) => {
-  const response = await api.get("/customer/orders", {
-    params: { page, limit },
-  });
-  return response.data;
+// Get user orders với bộ lọc (order_code, date_from, date_to, order_status)
+export const getUserOrders = async (page = 1, limit = 10, filters = {}) => {
+  const orderCode = typeof filters.order_code === "string" ? filters.order_code.trim() : "";
+  const orderStatus = filters.order_status && filters.order_status !== "all" ? String(filters.order_status) : "all";
+  const params = {
+    page: Number(page) || 1,
+    limit: Number(limit) || 10,
+    order_code: orderCode,
+    date_from: filters.date_from || "",
+    date_to: filters.date_to || "",
+    order_status: orderStatus,
+  };
+  const res = await api.get("/customer/orders", { params });
+  return res.data;
 };
 
 // Check payment status

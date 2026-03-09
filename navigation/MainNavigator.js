@@ -3,6 +3,7 @@ import BottomTabNavigator from "./BottomTabNavigator";
 import CheckoutScreen from "../screens/CheckoutScreen";
 import OrderSuccessScreen from "../screens/OrderSuccessScreen";
 import OrderHistoryScreen from "../screens/OrderHistoryScreen";
+import OrderDetailScreen from "../screens/OrderDetailScreen";
 import CouponScreen from "../screens/CouponScreen";
 import UserCouponsScreen from "../screens/UserCouponsScreen";
 import ChangePasswordScreen from "../screens/ChangePasswordScreen";
@@ -98,6 +99,11 @@ export default function MainNavigator() {
         name="OrderHistory"
         component={OrderHistoryScreen}
         options={{ title: "Lịch Sử Đơn Hàng" }}
+      />
+      <Stack.Screen
+        name="OrderDetail"
+        component={OrderDetailScreen}
+        options={{ title: "Chi Tiết Đơn Hàng" }}
       />
       <Stack.Screen
         name="Coupon"
