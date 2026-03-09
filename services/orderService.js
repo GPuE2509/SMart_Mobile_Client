@@ -49,6 +49,13 @@ export const addToCart = async (productUnitId, quantity = 1) => {
   return response.data;
 };
 
+export const addRecipeToCart = async (recipeId) => {
+  const response = await api.post("/customer/cart/add-recipe", {
+    recipeId,
+  });
+  return response.data;
+};
+
 export const updateCartQuantity = async (cartItemId, quantity) => {
   const response = await api.put(`/customer/cart/update/${cartItemId}`, {
     quantity,

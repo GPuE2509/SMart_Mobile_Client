@@ -72,6 +72,29 @@ export const CartProvider = ({ children }) => {
   };
 
   /**
+   * Add recipe ingredients to cart
+   */
+  const addRecipeToCart = async (recipeId) => {
+    if (!user) {
+      Alert.alert("Yêu cầu", "Vui lòng đăng nhập để thêm vào giỏ hàng!");
+      return false;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await orderService.addRecipeToCart(recipeId);
+      await loadCartAPI(); // Reload from server to get accurate IDs and sync
+      
+      return response; // Return the full response for caller to handle
+    } catch (error) {
+      console.error("Add recipe to cart error:", error);
+      throw error; // Re-throw for caller to handle
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
    * Remove item from online cart
    */
   const removeFromCart = async (cartItemId) => {
@@ -210,6 +233,7 @@ export const CartProvider = ({ children }) => {
     cartItems,
     isLoading, // Export loading state in case UI wants a spinner
     addToCart,
+    addRecipeToCart,
     removeFromCart,
     updateQuantity,
     clearCart,

@@ -7,15 +7,22 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import recipeService from "../services/recipeService";
+import * as orderService from "../services/orderService";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigation } from "@react-navigation/native";
 
 export default function RecipeDetailScreen({ route }) {
   const { recipeId } = route.params || {};
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cartLoading, setCartLoading] = useState(false);
+  const { user } = useAuth();
+  const navigation = useNavigation();
 
   useEffect(() => {
     loadRecipe();
@@ -36,6 +43,51 @@ export default function RecipeDetailScreen({ route }) {
       Alert.alert("Lỗi", "Không thể tải chi tiết công thức");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddIngredientsToCart = async () => {
+    if (!recipe || !recipe.ingredients || recipe.ingredients.length === 0) {
+      Alert.alert("Thông báo", "Công thức này không có nguyên liệu");
+      return;
+    }
+
+    if (!user) {
+      Alert.alert("Yêu cầu", "Vui lòng đăng nhập để thêm vào giỏ hàng!");
+      return;
+    }
+
+    try {
+      setCartLoading(true);
+      const response = await orderService.addRecipeToCart(recipeId);
+
+      if (response.success) {
+        // Show success alert with options
+        Alert.alert(
+          "Thành công",
+          response.message || "Đã thêm nguyên liệu vào giỏ hàng",
+          [
+            {
+              text: "Tiếp tục xem",
+              style: "cancel",
+            },
+            {
+              text: "Xem giỏ hàng",
+              onPress: () => navigation.navigate("MainTabs", { screen: "CartTab" }),
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Lỗi", response.message || "Không thể thêm nguyên liệu");
+      }
+    } catch (error) {
+      console.error("Add recipe to cart error:", error);
+      Alert.alert(
+        "Lỗi",
+        error.message || "Không thể thêm nguyên liệu vào giỏ hàng"
+      );
+    } finally {
+      setCartLoading(false);
     }
   };
 
@@ -77,21 +129,34 @@ export default function RecipeDetailScreen({ route }) {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Nguyên liệu</Text>
             {recipe.ingredients && recipe.ingredients.length > 0 ? (
-              recipe.ingredients.map((ing) => (
-                <View key={ing._id} style={styles.ingredientRow}>
-                  <View style={styles.ingredientBullet} />
-                  <View style={styles.ingredientTextContainer}>
-                    <Text style={styles.ingredientName}>
-                      {ing.product_name || "Nguyên liệu"}
-                    </Text>
-                    <Text style={styles.ingredientDetail}>
-                      {ing.quantity_needed
-                        ? `${ing.quantity_needed} ${ing.unit_note || ""}`
-                        : ing.unit_note || "Tùy khẩu vị"}
-                    </Text>
+              <>
+                {recipe.ingredients.map((ing) => (
+                  <View key={ing._id} style={styles.ingredientRow}>
+                    <View style={styles.ingredientBullet} />
+                    <View style={styles.ingredientTextContainer}>
+                      <Text style={styles.ingredientName}>
+                        {ing.product_name || "Nguyên liệu"}
+                      </Text>
+                      <Text style={styles.ingredientDetail}>
+                        {ing.quantity_needed
+                          ? `${ing.quantity_needed} ${ing.unit_note || ""}`
+                          : ing.unit_note || "Tùy khẩu vị"}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              ))
+                ))}
+                
+                <TouchableOpacity
+                  style={[styles.addToCartButton, cartLoading && styles.buttonDisabled]}
+                  onPress={handleAddIngredientsToCart}
+                  disabled={cartLoading}
+                >
+                  <Ionicons name="cart" size={20} color="#fff" />
+                  <Text style={styles.addToCartButtonText}>
+                    {cartLoading ? "Đang thêm..." : "Thêm tất cả vào giỏ hàng"}
+                  </Text>
+                </TouchableOpacity>
+              </>
             ) : (
               <Text style={styles.emptyText}>
                 Chưa có danh sách nguyên liệu cho công thức này.
@@ -197,6 +262,25 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: "#999",
+  },
+  addToCartButton: {
+    backgroundColor: "#4CAF50",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 16,
+    gap: 8,
+  },
+  buttonDisabled: {
+    backgroundColor: "#9E9E9E",
+  },
+  addToCartButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
