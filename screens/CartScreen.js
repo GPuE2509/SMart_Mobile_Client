@@ -294,6 +294,24 @@ export default function CartScreen({ navigation }) {
 
           <View style={styles.footer}>
             {/* Price Summary */}
+            {cartTotal.rescueSavings > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Giá gốc:</Text>
+                <Text style={styles.summaryValue}>
+                  {cartTotal.originalSubtotal.toLocaleString("vi-VN")}đ
+                </Text>
+              </View>
+            )}
+            {cartTotal.rescueSavings > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, styles.savingsLabel]}>
+                  🌟 Chương trình giảm giá:
+                </Text>
+                <Text style={[styles.summaryValue, styles.savingsValue]}>
+                  -{cartTotal.rescueSavings.toLocaleString("vi-VN")}đ
+                </Text>
+              </View>
+            )}
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Tạm tính:</Text>
               <Text style={styles.summaryValue}>
@@ -494,6 +512,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     fontWeight: "500",
+  },
+  savingsLabel: {
+    color: "#FF6B00",
+    fontWeight: "600",
+  },
+  savingsValue: {
+    color: "#FF6B00",
+    fontWeight: "700",
   },
   divider: {
     height: 1,

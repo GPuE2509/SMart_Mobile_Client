@@ -12,9 +12,17 @@ export default function ProductCard({ product, onPress }) {
   const getDisplayPrice = () => {
     if (product.min_price) {
       if (product.max_price && product.max_price !== product.min_price) {
-        return `${product.min_price.toLocaleString("vi-VN")}đ - ${product.max_price.toLocaleString("vi-VN")}đ`;
+        return {
+          min: product.min_price,
+          max: product.max_price,
+          isRange: true,
+        };
       }
-      return `${product.min_price.toLocaleString("vi-VN")}đ`;
+      return {
+        min: product.min_price,
+        max: product.min_price,
+        isRange: false,
+      };
     }
 
     if (product.units && product.units.length > 0) {
@@ -22,16 +30,24 @@ export default function ProductCard({ product, onPress }) {
       const minPrice = Math.min(...prices);
       const maxPrice = Math.max(...prices);
 
-      if (minPrice !== maxPrice) {
-        return `${minPrice.toLocaleString("vi-VN")}đ - ${maxPrice.toLocaleString("vi-VN")}đ`;
-      }
-      return `${minPrice.toLocaleString("vi-VN")}đ`;
+      return {
+        min: minPrice,
+        max: maxPrice,
+        isRange: minPrice !== maxPrice,
+      };
     }
 
-    return "Liên hệ";
+    return null;
   };
 
-  const displayPrice = getDisplayPrice();
+  const priceData = getDisplayPrice();
+  const hasRescue = product.maxRescueDiscount > 0;
+
+  // Calculate discounted price if rescue pricing exists
+  const getDiscountedPrice = (price) => {
+    if (!hasRescue) return price;
+    return Math.round(price * (1 - product.maxRescueDiscount / 100));
+  };
 
   return (
     <TouchableOpacity
@@ -39,18 +55,45 @@ export default function ProductCard({ product, onPress }) {
       onPress={handleCardPress}
       activeOpacity={0.7}
     >
-      <Image
-        source={{ uri: product.image_url || "https://via.placeholder.com/150" }}
-        style={styles.image}
-        resizeMode="cover"
-      />
+      <View style={styles.imageContainer}>
+        <Image
+          source={{ uri: product.image_url || "https://via.placeholder.com/150" }}
+          style={styles.image}
+          resizeMode="cover"
+        />
+        {product.maxRescueDiscount > 0 && (
+          <View style={styles.rescueBadge}>
+            <Ionicons name="flash" size={12} color="#fff" />
+            <Text style={styles.rescueBadgeText}>
+              -{product.maxRescueDiscount}%
+            </Text>
+          </View>
+        )}
+      </View>
 
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>
           {product.name}
         </Text>
 
-        <Text style={styles.price}>{displayPrice}</Text>
+        {priceData ? (
+          <View style={styles.priceContainer}>
+            {hasRescue && (
+              <Text style={styles.originalPrice}>
+                {priceData.isRange
+                  ? `${priceData.min.toLocaleString("vi-VN")}đ - ${priceData.max.toLocaleString("vi-VN")}đ`
+                  : `${priceData.min.toLocaleString("vi-VN")}đ`}
+              </Text>
+            )}
+            <Text style={[styles.price, hasRescue && styles.discountedPrice]}>
+              {priceData.isRange
+                ? `${getDiscountedPrice(priceData.min).toLocaleString("vi-VN")}đ - ${getDiscountedPrice(priceData.max).toLocaleString("vi-VN")}đ`
+                : `${getDiscountedPrice(priceData.min).toLocaleString("vi-VN")}đ`}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.price}>Liên hệ</Text>
+        )}
 
         <View style={styles.viewButton}>
           <Text style={styles.viewButtonText}>Xem chi tiết</Text>
@@ -73,10 +116,32 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  image: {
+  imageContainer: {
+    position: "relative",
     width: "100%",
     height: 120,
+  },
+  image: {
+    width: "100%",
+    height: "100%",
     backgroundColor: "#f0f0f0",
+  },
+  rescueBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#FF6B00",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 2,
+  },
+  rescueBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
   },
   content: {
     padding: 10,
@@ -88,11 +153,22 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     minHeight: 36,
   },
+  priceContainer: {
+    marginBottom: 8,
+  },
+  originalPrice: {
+    fontSize: 12,
+    color: "#999",
+    textDecorationLine: "line-through",
+    marginBottom: 2,
+  },
   price: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#4CAF50",
-    marginBottom: 8,
+  },
+  discountedPrice: {
+    color: "#FF6B00",
   },
   viewButton: {
     flexDirection: "row",

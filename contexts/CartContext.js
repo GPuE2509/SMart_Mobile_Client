@@ -120,13 +120,9 @@ export const CartProvider = ({ children }) => {
     }
 
     try {
-      // Optimistic update
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.id === cartItemId ? { ...item, quantity: newQuantity } : item
-        )
-      );
       await orderService.updateCartQuantity(cartItemId, newQuantity);
+      // Reload cart to get updated rescue pricing
+      await loadCartAPI();
     } catch (error) {
       console.error("Update quantity error:", error);
       await loadCartAPI(); // Revert to server state on failure
@@ -187,26 +183,47 @@ export const CartProvider = ({ children }) => {
       ? cartItems.filter((item) => item.selected)
       : cartItems;
 
+    let originalSubtotal = 0;
+    let rescueSavings = 0;
+
     const subtotal = items.reduce((total, item) => {
-      // Safety check in case productUnit fails to populate
-      const price = item.productUnit?.price || 0;
+      // Use rescue pricing if available, otherwise use regular price
+      const hasRescue = item.rescuePricing?.isAvailable;
+      const price = hasRescue 
+        ? item.rescuePricing.discountedPrice 
+        : (item.productUnit?.price || 0);
+      
+      const originalPrice = item.productUnit?.price || 0;
+      originalSubtotal += originalPrice * item.quantity;
+      
+      if (hasRescue) {
+        // Backend already calculated savings with quantity included
+        rescueSavings += item.rescuePricing.savings || 0;
+      }
+      
       return total + price * item.quantity;
     }, 0);
 
     const totalTax = items.reduce((total, item) => {
-      const price = item.productUnit?.price || 0;
+      // Tax is calculated on discounted price if rescue pricing applies
+      const hasRescue = item.rescuePricing?.isAvailable;
+      const price = hasRescue 
+        ? item.rescuePricing.discountedPrice 
+        : (item.productUnit?.price || 0);
       const taxPercent = item.product?.tax_percentage || 0;
-      const itemTax = (price * item.quantity * taxPercent) / 100;
+      const itemTax = Math.round((price * item.quantity * taxPercent) / 100);
       return total + itemTax;
     }, 0);
 
     const averageTaxRate = subtotal > 0 ? (totalTax / subtotal) * 100 : 0;
 
     return {
-      subtotal,
-      taxAmount: totalTax,
+      originalSubtotal: Math.round(originalSubtotal),
+      rescueSavings: Math.round(rescueSavings),
+      subtotal: Math.round(subtotal),
+      taxAmount: Math.round(totalTax),
       taxRate: averageTaxRate.toFixed(2),
-      total: subtotal + totalTax,
+      total: Math.round(subtotal + totalTax),
       itemCount: selectedOnly
         ? items.reduce((sum, item) => sum + item.quantity, 0)
         : getCartItemCount(),

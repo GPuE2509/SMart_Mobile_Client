@@ -288,12 +288,36 @@ export default function ProductDetailScreen({ navigation, route }) {
           {/* Price */}
           {selectedUnit && (
             <View style={styles.priceContainer}>
-              <Text style={styles.price}>
-                {formatPrice(selectedUnit.price)}
-              </Text>
-              <Text style={styles.priceUnit}>
-                / {selectedUnit.unit_id?.name || "đơn vị"}
-              </Text>
+              {selectedUnit.maxRescueDiscount > 0 ? (
+                <View style={styles.priceWithRescue}>
+                  <Text style={styles.originalPrice}>
+                    {formatPrice(selectedUnit.price)}
+                  </Text>
+                  <View style={styles.rescuePriceRow}>
+                    <Text style={styles.rescuePrice}>
+                      {formatPrice(Math.round(selectedUnit.price * (1 - selectedUnit.maxRescueDiscount / 100)))}
+                    </Text>
+                    <View style={styles.rescueBadge}>
+                      <Ionicons name="flash" size={12} color="#fff" />
+                      <Text style={styles.rescueBadgeText}>
+                        -{selectedUnit.maxRescueDiscount}%
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.priceUnit}>
+                    / {selectedUnit.unit_id?.name || "đơn vị"}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.price}>
+                    {formatPrice(selectedUnit.price)}
+                  </Text>
+                  <Text style={styles.priceUnit}>
+                    / {selectedUnit.unit_id?.name || "đơn vị"}
+                  </Text>
+                </>
+              )}
             </View>
           )}
 
@@ -308,13 +332,13 @@ export default function ProductDetailScreen({ navigation, route }) {
             <View style={styles.unitSelectionContainer}>
               <Text style={styles.sectionTitle}>Chọn đơn vị</Text>
               <View style={styles.unitOptions}>
-                {productUnits.map((unit) => {
+                {productUnits.map((unit, index) => {
                   const unitStock = unit.available_stock || 0;
                   const isOutOfStock = unitStock === 0;
 
                   return (
                     <TouchableOpacity
-                      key={unit._id}
+                      key={`${unit._id}-${index}`}
                       style={[
                         styles.unitOption,
                         selectedUnit?._id === unit._id &&
@@ -331,17 +355,26 @@ export default function ProductDetailScreen({ navigation, route }) {
                     >
                       <View style={styles.unitOptionContent}>
                         <View style={styles.unitNameContainer}>
-                          <Text
-                            style={[
-                              styles.unitName,
-                              selectedUnit?._id === unit._id &&
-                                styles.unitNameActive,
-                              isOutOfStock && styles.unitTextDisabled,
-                            ]}
-                          >
-                            {unit.unit_id?.name || "Đơn vị"}
-                            {unit.unit_value > 1 && ` (${unit.unit_value})`}
-                          </Text>
+                          <View style={styles.unitNameRow}>
+                            <Text
+                              style={[
+                                styles.unitName,
+                                selectedUnit?._id === unit._id &&
+                                  styles.unitNameActive,
+                                isOutOfStock && styles.unitTextDisabled,
+                              ]}
+                            >
+                              {unit.unit_id?.name || "Đơn vị"}
+                              {unit.unit_value > 1 && ` (${unit.unit_value})`}
+                            </Text>
+                            {unit.maxRescueDiscount > 0 && !isOutOfStock && (
+                              <View style={styles.unitRescueBadge}>
+                                <Text style={styles.unitRescueBadgeText}>
+                                  -{unit.maxRescueDiscount}%
+                                </Text>
+                              </View>
+                            )}
+                          </View>
                           <Text
                             style={[
                               styles.unitStock,
@@ -353,16 +386,35 @@ export default function ProductDetailScreen({ navigation, route }) {
                             {isOutOfStock ? "Hết hàng" : `Còn ${unitStock}`}
                           </Text>
                         </View>
-                        <Text
-                          style={[
-                            styles.unitPrice,
-                            selectedUnit?._id === unit._id &&
-                              styles.unitPriceActive,
-                            isOutOfStock && styles.unitTextDisabled,
-                          ]}
-                        >
-                          {formatPrice(unit.price)}
-                        </Text>
+                        <View style={styles.unitPriceContainer}>
+                          {unit.maxRescueDiscount > 0 && !isOutOfStock ? (
+                            <View style={styles.unitPriceWithRescue}>
+                              <Text style={styles.unitOriginalPrice}>
+                                {formatPrice(unit.price)}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.unitRescuePrice,
+                                  selectedUnit?._id === unit._id &&
+                                    styles.unitPriceActive,
+                                ]}
+                              >
+                                {formatPrice(Math.round(unit.price * (1 - unit.maxRescueDiscount / 100)))}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text
+                              style={[
+                                styles.unitPrice,
+                                selectedUnit?._id === unit._id &&
+                                  styles.unitPriceActive,
+                                isOutOfStock && styles.unitTextDisabled,
+                              ]}
+                            >
+                              {formatPrice(unit.price)}
+                            </Text>
+                          )}
+                        </View>
                       </View>
                       {selectedUnit?._id === unit._id && !isOutOfStock && (
                         <Ionicons
@@ -479,7 +531,15 @@ export default function ProductDetailScreen({ navigation, route }) {
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>Tổng cộng</Text>
           <Text style={styles.totalPrice}>
-            {selectedUnit ? formatPrice(selectedUnit.price * quantity) : "0đ"}
+            {selectedUnit 
+              ? formatPrice(
+                  Math.round(
+                    (selectedUnit.maxRescueDiscount > 0 
+                      ? selectedUnit.price * (1 - selectedUnit.maxRescueDiscount / 100)
+                      : selectedUnit.price) * quantity
+                  )
+                )
+              : "0đ"}
           </Text>
         </View>
         <TouchableOpacity
@@ -603,6 +663,40 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     marginBottom: 16,
   },
+  priceWithRescue: {
+    flexDirection: "column",
+  },
+  originalPrice: {
+    fontSize: 16,
+    color: "#999",
+    textDecorationLine: "line-through",
+    marginBottom: 4,
+  },
+  rescuePriceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  rescuePrice: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#FF6B00",
+  },
+  rescueBadge: {
+    backgroundColor: "#FF6B00",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 2,
+  },
+  rescueBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
   price: {
     fontSize: 28,
     fontWeight: "bold",
@@ -660,6 +754,22 @@ const styles = StyleSheet.create({
   unitNameContainer: {
     flex: 1,
   },
+  unitNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  unitRescueBadge: {
+    backgroundColor: "#FF6B00",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  unitRescueBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
   unitName: {
     fontSize: 16,
     fontWeight: "600",
@@ -683,11 +793,27 @@ const styles = StyleSheet.create({
     color: "#f44336",
     fontWeight: "600",
   },
+  unitPriceContainer: {
+    marginLeft: 12,
+  },
+  unitPriceWithRescue: {
+    alignItems: "flex-end",
+  },
+  unitOriginalPrice: {
+    fontSize: 12,
+    color: "#999",
+    textDecorationLine: "line-through",
+    marginBottom: 2,
+  },
+  unitRescuePrice: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FF6B00",
+  },
   unitPrice: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#4CAF50",
-    marginLeft: 12,
   },
   unitPriceActive: {
     color: "#2E7D32",
