@@ -5,7 +5,7 @@ import { Platform } from "react-native";
 // API Base URL - Automatically detect platform
 // IMPORTANT: For real device, change this IP to your computer's IP address
 // You can find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-const API_HOST = "10.10.10.83";
+const API_HOST = "10.10.9.119";
 const getApiBaseUrl = () => {
   if (Platform.OS === "web") {
     return "http://localhost:3000/api/v1";
