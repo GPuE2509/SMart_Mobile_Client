@@ -74,12 +74,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Lấy data mới nhất từ server (dùng khi cần hiển thị loyalty_points cập nhật)
+  const refreshUser = async () => {
+    try {
+      const freshUser = await authService.getCurrentUser();
+      if (freshUser) {
+        setUser(freshUser);
+        await AsyncStorage.setItem('user', JSON.stringify(freshUser));
+      }
+      return freshUser;
+    } catch (error) {
+      // Giữ nguyên user cũ nếu lỗi network
+      console.warn('[AuthContext] refreshUser thất bại:', error.message);
+    }
+  };
+
   const value = {
     user,
     loading,
     login,
     logout,
     updateProfile,
+    refreshUser,
     isAuthenticated: !!user,
   };
 

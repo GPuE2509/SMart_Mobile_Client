@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,12 +12,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import couponService from "../services/couponService";
 import userCouponService from "../services/userCouponService";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function CouponScreen() {
-  const { user, updateProfile, isAuthenticated } = useAuth();
+  const { user, updateProfile, isAuthenticated, refreshUser } = useAuth();
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,6 +57,15 @@ export default function CouponScreen() {
   useEffect(() => {
     setLoyaltyPoints(user?.loyalty_points || 0);
   }, [user]);
+
+  // Refresh user data mỗi khi tab này được focus → lấy điểm mới nhất từ server
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated) {
+        refreshUser();
+      }
+    }, [isAuthenticated])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
