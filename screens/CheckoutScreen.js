@@ -29,7 +29,8 @@ import userCouponService from "../services/userCouponService";
 export default function CheckoutScreen({ navigation, route }) {
   const { user } = useAuth();
   const { removeSelectedItems } = useCart();
-  const { selectedItems } = route.params || {};
+  const { selectedItems, source } = route.params || {};
+  const isReorderFlow = source === "reorder";
 
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("payos");
@@ -357,7 +358,9 @@ export default function CheckoutScreen({ navigation, route }) {
         // Cash on delivery - fetch full order details and navigate to success screen
         const fullOrderResponse = await getOrderById(order._id);
         if (fullOrderResponse.success) {
-          removeSelectedItems();
+          if (!isReorderFlow) {
+            removeSelectedItems();
+          }
           navigation.navigate("OrderSuccess", {
             order: fullOrderResponse.data.order,
             orderDetails: fullOrderResponse.data.orderDetails,
@@ -389,27 +392,42 @@ export default function CheckoutScreen({ navigation, route }) {
           // Payment successful - fetch full order details before navigating
           const fullOrderResponse = await getOrderById(orderId);
           if (fullOrderResponse.success) {
-            removeSelectedItems();
+            if (!isReorderFlow) {
+              removeSelectedItems();
+            }
             navigation.navigate("OrderSuccess", {
               order: fullOrderResponse.data.order,
               orderDetails: fullOrderResponse.data.orderDetails,
             });
           } else {
-            // Failed to get order details, go back to cart
-            navigation.navigate("MainTabs", { screen: "CartTab" });
+            // Failed to get order details, return to the most relevant screen
+            if (isReorderFlow) {
+              navigation.navigate("OrderHistory");
+            } else {
+              navigation.navigate("MainTabs", { screen: "CartTab" });
+            }
           }
         } else {
-          // Unpaid - DON'T remove items, just go back to cart
-          navigation.navigate("MainTabs", { screen: "CartTab" });
+          if (isReorderFlow) {
+            navigation.navigate("OrderHistory");
+          } else {
+            navigation.navigate("MainTabs", { screen: "CartTab" });
+          }
         }
       } else {
-        // Error checking status - go back to cart, keep items
-        navigation.navigate("MainTabs", { screen: "CartTab" });
+        if (isReorderFlow) {
+          navigation.navigate("OrderHistory");
+        } else {
+          navigation.navigate("MainTabs", { screen: "CartTab" });
+        }
       }
     } catch (error) {
       console.error("Check payment status error:", error);
-      // Error - go back to cart, keep items
-      navigation.navigate("MainTabs", { screen: "CartTab" });
+      if (isReorderFlow) {
+        navigation.navigate("OrderHistory");
+      } else {
+        navigation.navigate("MainTabs", { screen: "CartTab" });
+      }
     }
   };
 

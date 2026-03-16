@@ -9,11 +9,13 @@ import {
   RefreshControl,
   TextInput,
   ScrollView,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import * as orderService from "../services/orderService";
+import ReorderSelectionModal from "../components/ReorderSelectionModal";
 
 const PAGE_SIZE = 10;
 
@@ -84,6 +86,11 @@ export default function OrderHistoryScreen({ navigation }) {
   const [orderStatus, setOrderStatus] = useState("all");
   const [appliedFilters, setAppliedFilters] = useState({});
   const filtersRef = useRef({});
+  const [reorderLoadingMap, setReorderLoadingMap] = useState({});
+  const [reorderModalVisible, setReorderModalVisible] = useState(false);
+  const [reorderPreviewItems, setReorderPreviewItems] = useState([]);
+  const [reorderPreviewLoading, setReorderPreviewLoading] = useState(false);
+  const [activeReorderOrder, setActiveReorderOrder] = useState(null);
 
   const loadOrders = useCallback(async (pageNum = 1, append = false, filtersOverride = null) => {
     const filters = filtersOverride != null ? { ...filtersOverride } : { ...filtersRef.current };
@@ -167,45 +174,100 @@ export default function OrderHistoryScreen({ navigation }) {
     [navigation],
   );
 
+  const handleReorder = useCallback(
+    async (orderId) => {
+      try {
+        setReorderLoadingMap((prev) => ({ ...prev, [orderId]: true }));
+
+        setReorderPreviewLoading(true);
+        const res = await orderService.getReorderPreview(orderId);
+        const preview = res?.data || res;
+        const items = preview?.items || [];
+
+        if (!items.length) {
+          Alert.alert("Thông báo", "Đơn hàng này không có sản phẩm để mua lại.");
+          return;
+        }
+
+        setActiveReorderOrder(preview?.order || null);
+        setReorderPreviewItems(items);
+        setReorderModalVisible(true);
+      } catch (err) {
+        Alert.alert("Không thể tải danh sách sản phẩm", err?.message || "Vui lòng thử lại sau");
+      } finally {
+        setReorderPreviewLoading(false);
+        setReorderLoadingMap((prev) => ({ ...prev, [orderId]: false }));
+      }
+    },
+    [],
+  );
+
+  const handleConfirmReorder = useCallback(
+    (selectedItems) => {
+      setReorderModalVisible(false);
+      navigation.navigate("Checkout", {
+        selectedItems,
+        source: "reorder",
+        reorderOrderId: activeReorderOrder?._id,
+      });
+    },
+    [navigation, activeReorderOrder],
+  );
+
   function renderItem({ item }) {
+    const isReordering = !!reorderLoadingMap[item._id];
+
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => onPressOrder(item._id)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.orderCode}>{item.order_code}</Text>
-          <Text style={styles.date}>
-            {dayjs(item.created_at).format("DD/MM/YYYY HH:mm")}
-          </Text>
-        </View>
-        <View style={styles.cardRow}>
-          <Text style={styles.label}>Tổng tiền:</Text>
-          <Text style={styles.amount}>{formatPrice(item.final_amount)}</Text>
-        </View>
-        <View style={styles.cardRow}>
-          <Text style={styles.label}>Trạng thái đơn:</Text>
-          <Text
-            style={[
-              styles.statusOrder,
-              { color: getOrderStatusColor(item.order_status) },
-            ]}
-          >
-            {getOrderStatusText(item.order_status)}
-          </Text>
-        </View>
-        <View style={styles.cardRow}>
-          <Text style={styles.label}>Thanh toán:</Text>
-          <Text style={styles.statusPayment}>
-            {getPaymentStatusText(item.payment_status)}
-          </Text>
-        </View>
-        <View style={styles.arrowRow}>
-          <Text style={styles.detailLink}>Xem chi tiết</Text>
-          <Ionicons name="chevron-forward" size={18} color="#4CAF50" />
-        </View>
-      </TouchableOpacity>
+      <View style={styles.card}>
+        <TouchableOpacity onPress={() => onPressOrder(item._id)} activeOpacity={0.7}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.orderCode}>{item.order_code}</Text>
+            <Text style={styles.date}>
+              {dayjs(item.created_at).format("DD/MM/YYYY HH:mm")}
+            </Text>
+          </View>
+          <View style={styles.cardRow}>
+            <Text style={styles.label}>Tổng tiền:</Text>
+            <Text style={styles.amount}>{formatPrice(item.final_amount)}</Text>
+          </View>
+          <View style={styles.cardRow}>
+            <Text style={styles.label}>Trạng thái đơn:</Text>
+            <Text
+              style={[
+                styles.statusOrder,
+                { color: getOrderStatusColor(item.order_status) },
+              ]}
+            >
+              {getOrderStatusText(item.order_status)}
+            </Text>
+          </View>
+          <View style={styles.cardRow}>
+            <Text style={styles.label}>Thanh toán:</Text>
+            <Text style={styles.statusPayment}>
+              {getPaymentStatusText(item.payment_status)}
+            </Text>
+          </View>
+          <View style={styles.arrowRow}>
+            <Text style={styles.detailLink}>Xem chi tiết</Text>
+            <Ionicons name="chevron-forward" size={18} color="#4CAF50" />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.reorderButton, isReordering && styles.reorderButtonDisabled]}
+          onPress={() => handleReorder(item._id)}
+          disabled={isReordering}
+        >
+          {isReordering ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="reload-outline" size={18} color="#fff" />
+              <Text style={styles.reorderButtonText}>Chọn mua lại</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     );
   }
 
@@ -339,6 +401,14 @@ export default function OrderHistoryScreen({ navigation }) {
             </View>
           ) : null
         }
+      />
+      <ReorderSelectionModal
+        visible={reorderModalVisible}
+        loading={reorderPreviewLoading}
+        orderCode={activeReorderOrder?.order_code}
+        items={reorderPreviewItems}
+        onClose={() => setReorderModalVisible(false)}
+        onConfirm={handleConfirmReorder}
       />
     </SafeAreaView>
   );
@@ -533,6 +603,24 @@ const styles = StyleSheet.create({
   detailLink: {
     fontSize: 14,
     color: "#4CAF50",
+    fontWeight: "600",
+  },
+  reorderButton: {
+    marginTop: 10,
+    backgroundColor: "#2E7D32",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  reorderButtonDisabled: {
+    opacity: 0.7,
+  },
+  reorderButtonText: {
+    color: "#fff",
+    fontSize: 14,
     fontWeight: "600",
   },
   empty: {
