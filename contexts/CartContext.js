@@ -249,6 +249,7 @@ export const CartProvider = ({ children }) => {
   const value = {
     cartItems,
     isLoading, // Export loading state in case UI wants a spinner
+    refreshCart: loadCartAPI,
     addToCart,
     addRecipeToCart,
     removeFromCart,

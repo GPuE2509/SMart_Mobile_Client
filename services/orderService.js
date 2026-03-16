@@ -20,6 +20,17 @@ export const getOrderById = async (orderId) => {
   return response.data;
 };
 
+export const getReorderPreview = async (orderId) => {
+  const response = await api.get(`/customer/orders/${orderId}/reorder-preview`);
+  return response.data;
+};
+
+// Reorder: add order items back to cart
+export const reorderOrder = async (orderId) => {
+  const response = await api.post(`/customer/orders/${orderId}/reorder`);
+  return response.data;
+};
+
 // Get user orders với bộ lọc (order_code, date_from, date_to, order_status)
 export const getUserOrders = async (page = 1, limit = 10, filters = {}) => {
   const orderCode = typeof filters.order_code === "string" ? filters.order_code.trim() : "";

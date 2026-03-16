@@ -6,11 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import * as orderService from "../services/orderService";
+import ReorderSelectionModal from "../components/ReorderSelectionModal";
 
 function formatPrice(price) {
   return (price || 0).toLocaleString("vi-VN") + "đ";
@@ -70,6 +72,41 @@ export default function OrderDetailScreen({ navigation, route }) {
   const [orderDetails, setOrderDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reordering, setReordering] = useState(false);
+  const [reorderPreviewItems, setReorderPreviewItems] = useState([]);
+  const [reorderModalVisible, setReorderModalVisible] = useState(false);
+
+  const handleReorder = async () => {
+    if (!order?._id || reordering) return;
+
+    try {
+      setReordering(true);
+      const res = await orderService.getReorderPreview(order._id);
+      const preview = res?.data || res;
+      const items = preview?.items || [];
+
+      if (!items.length) {
+        Alert.alert("Thông báo", "Đơn hàng này không có sản phẩm để mua lại.");
+        return;
+      }
+
+      setReorderPreviewItems(items);
+      setReorderModalVisible(true);
+    } catch (err) {
+      Alert.alert("Không thể tải danh sách sản phẩm", err?.message || "Vui lòng thử lại sau");
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const handleConfirmReorder = (selectedItems) => {
+    setReorderModalVisible(false);
+    navigation.navigate("Checkout", {
+      selectedItems,
+      source: "reorder",
+      reorderOrderId: order?._id,
+    });
+  };
 
   useEffect(() => {
     if (!orderId) {
@@ -137,7 +174,23 @@ export default function OrderDetailScreen({ navigation, route }) {
       <ScrollView style={styles.content}>
         {/* Order info header */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
+            <TouchableOpacity
+              style={[styles.topReorderButton, reordering && styles.buttonDisabled]}
+              onPress={handleReorder}
+              disabled={reordering}
+            >
+              {reordering ? (
+                <ActivityIndicator size="small" color="#4CAF50" />
+              ) : (
+                <>
+                  <Ionicons name="reload-outline" size={16} color="#4CAF50" />
+                  <Text style={styles.topReorderButtonText}>Mua lại</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Mã đơn hàng:</Text>
             <Text style={styles.infoValue}>{order.order_code}</Text>
@@ -246,6 +299,15 @@ export default function OrderDetailScreen({ navigation, route }) {
           <Text style={styles.primaryButtonText}>Xem tất cả đơn hàng</Text>
         </TouchableOpacity>
       </View>
+
+      <ReorderSelectionModal
+        visible={reorderModalVisible}
+        loading={false}
+        orderCode={order?.order_code}
+        items={reorderPreviewItems}
+        onClose={() => setReorderModalVisible(false)}
+        onConfirm={handleConfirmReorder}
+      />
     </SafeAreaView>
   );
 }
@@ -292,11 +354,34 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    gap: 12,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 16,
+  },
+  topReorderButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#A5D6A7",
+    backgroundColor: "#F1F8E9",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  topReorderButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2E7D32",
   },
   infoRow: {
     flexDirection: "row",
@@ -414,6 +499,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     color: "#fff",
