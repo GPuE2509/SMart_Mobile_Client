@@ -12,8 +12,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import recipeService from "../services/recipeService";
-import * as orderService from "../services/orderService";
 import { useAuth } from "../contexts/AuthContext";
+import { useCart } from "../contexts/CartContext";
 import { useNavigation } from "@react-navigation/native";
 
 export default function RecipeDetailScreen({ route }) {
@@ -22,6 +22,7 @@ export default function RecipeDetailScreen({ route }) {
   const [loading, setLoading] = useState(true);
   const [cartLoading, setCartLoading] = useState(false);
   const { user } = useAuth();
+  const { addRecipeToCart } = useCart();
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -46,6 +47,23 @@ export default function RecipeDetailScreen({ route }) {
     }
   };
 
+  const formatIngredientErrors = (errors = []) => {
+    if (!Array.isArray(errors) || errors.length === 0) return "";
+
+    const maxItems = 5;
+    const lines = errors.slice(0, maxItems).map((err, index) => {
+      const namePrefix = err.product_name ? `${err.product_name}: ` : "";
+      return `${index + 1}. ${namePrefix}${err.message || "Không thể thêm"}`;
+    });
+
+    const moreText =
+      errors.length > maxItems
+        ? `\n...và ${errors.length - maxItems} nguyên liệu khác`
+        : "";
+
+    return `${lines.join("\n")}${moreText}`;
+  };
+
   const handleAddIngredientsToCart = async () => {
     if (!recipe || !recipe.ingredients || recipe.ingredients.length === 0) {
       Alert.alert("Thông báo", "Công thức này không có nguyên liệu");
@@ -59,13 +77,17 @@ export default function RecipeDetailScreen({ route }) {
 
     try {
       setCartLoading(true);
-      const response = await orderService.addRecipeToCart(recipeId);
+      const response = await addRecipeToCart(recipeId);
+      const hasErrors = Array.isArray(response?.errors) && response.errors.length > 0;
+      const errorDetails = hasErrors
+        ? `\n\nKhông thể thêm:\n${formatIngredientErrors(response.errors)}`
+        : "";
 
       if (response.success) {
-        // Show success alert with options
+        // Show success/partial-success alert
         Alert.alert(
-          "Thành công",
-          response.message || "Đã thêm nguyên liệu vào giỏ hàng",
+          hasErrors ? "Đã thêm một phần" : "Thành công",
+          `${response.message || "Đã thêm nguyên liệu vào giỏ hàng"}${errorDetails}`,
           [
             {
               text: "Tiếp tục xem",
@@ -78,7 +100,10 @@ export default function RecipeDetailScreen({ route }) {
           ]
         );
       } else {
-        Alert.alert("Lỗi", response.message || "Không thể thêm nguyên liệu");
+        Alert.alert(
+          "Không thể thêm vào giỏ",
+          `${response.message || "Không thể thêm nguyên liệu"}${errorDetails}`
+        );
       }
     } catch (error) {
       console.error("Add recipe to cart error:", error);
