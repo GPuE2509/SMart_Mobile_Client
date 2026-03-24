@@ -92,10 +92,12 @@ export default function CheckoutScreen({ navigation, route }) {
   useEffect(() => {
     const loadUserCoupons = async () => {
       if (!user) return;
-      
+
       setLoadingCoupons(true);
       try {
-        const response = await userCouponService.getMyCoupons({ is_used: false });
+        const response = await userCouponService.getMyCoupons({
+          is_used: false,
+        });
         if (response.success && response.data) {
           setUserCoupons(response.data);
         }
@@ -112,12 +114,12 @@ export default function CheckoutScreen({ navigation, route }) {
   const handleSelectCoupon = async (coupon) => {
     setShowCouponPicker(false);
     setLoading(true);
-    
+
     try {
       const subtotal = calculateTotal().subtotal;
       const response = await userCouponService.validateCoupon(
         coupon.coupon_id.code,
-        subtotal
+        subtotal,
       );
 
       if (!response.success) {
@@ -136,7 +138,7 @@ export default function CheckoutScreen({ navigation, route }) {
       setCouponError("");
       Alert.alert(
         "Thành công",
-        `Đã áp dụng mã giảm giá: ${coupon.coupon_id.code}`
+        `Đã áp dụng mã giảm giá: ${coupon.coupon_id.code}`,
       );
     } catch (error) {
       console.error("Failed to validate coupon:", error);
@@ -155,7 +157,7 @@ export default function CheckoutScreen({ navigation, route }) {
   // Calculate discount
   const calculateDiscount = () => {
     if (!appliedCoupon || !appliedCoupon.discount) return 0;
-    
+
     // Use the discount amount already validated by backend
     return Math.round(appliedCoupon.discount);
   };
@@ -163,45 +165,50 @@ export default function CheckoutScreen({ navigation, route }) {
   // Calculate total from selected items only
   const calculateTotal = () => {
     if (!selectedItems || selectedItems.length === 0) {
-      return { 
-        originalSubtotal: 0, 
-        rescueSavings: 0, 
-        subtotal: 0, 
-        taxAmount: 0, 
-        total: 0, 
-        itemCount: 0 
+      return {
+        originalSubtotal: 0,
+        rescueSavings: 0,
+        subtotal: 0,
+        taxAmount: 0,
+        total: 0,
+        itemCount: 0,
       };
     }
 
-    let originalSubtotal = 0;
-    let rescueSavings = 0;
+    const originalSubtotal = selectedItems.reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item?.pricing_detail?.line_original_subtotal ??
+            (item?.productUnit?.price || 0) * (item?.quantity || 0),
+        ),
+      0,
+    );
 
-    const subtotal = selectedItems.reduce((total, item) => {
-      // Use rescue pricing if available
-      const hasRescue = item.rescuePricing?.isAvailable;
-      const price = hasRescue 
-        ? item.rescuePricing.discountedPrice 
-        : item.productUnit.price;
-      
-      const originalPrice = item.productUnit.price;
-      originalSubtotal += originalPrice * item.quantity;
-      
-      if (hasRescue) {
-        rescueSavings += item.rescuePricing.savings || 0;
+    const subtotal = selectedItems.reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item?.pricing_detail?.line_subtotal ??
+            (item?.productUnit?.price || 0) * (item?.quantity || 0),
+        ),
+      0,
+    );
+
+    const rescueSavings = Math.max(0, originalSubtotal - subtotal);
+
+    const taxAmount = selectedItems.reduce((sum, item) => {
+      const lineTax = item?.pricing_detail?.line_tax_amount;
+      if (lineTax !== undefined && lineTax !== null) {
+        return sum + Number(lineTax || 0);
       }
-      
-      return total + price * item.quantity;
-    }, 0);
 
-    const taxAmount = selectedItems.reduce((total, item) => {
-      // Tax is calculated on discounted price if rescue pricing applies
-      const hasRescue = item.rescuePricing?.isAvailable;
-      const price = hasRescue 
-        ? item.rescuePricing.discountedPrice 
-        : item.productUnit.price;
-      const itemSubtotal = price * item.quantity;
-      const itemTax = Math.round((itemSubtotal * (item.product.tax_percentage || 0)) / 100);
-      return total + itemTax;
+      const itemSubtotal =
+        (item?.productUnit?.price || 0) * (item?.quantity || 0);
+      const itemTax = Math.round(
+        (itemSubtotal * Number(item?.product?.tax_percentage || 0)) / 100,
+      );
+      return sum + itemTax;
     }, 0);
 
     const itemCount = selectedItems.reduce(
@@ -336,7 +343,7 @@ export default function CheckoutScreen({ navigation, route }) {
                 onPress: () => resolve(true),
               },
             ],
-            { cancelable: false }
+            { cancelable: false },
           );
         });
 
@@ -372,7 +379,9 @@ export default function CheckoutScreen({ navigation, route }) {
       }
     } catch (error) {
       // Clean up the error message if it has "Error: " prefix
-      const cleanMessage = error.message ? error.message.replace(/^Error:\s*/i, '') : "Có lỗi xảy ra khi thanh toán";
+      const cleanMessage = error.message
+        ? error.message.replace(/^Error:\s*/i, "")
+        : "Có lỗi xảy ra khi thanh toán";
 
       Alert.alert("Thông báo", cleanMessage);
     } finally {
@@ -446,17 +455,20 @@ export default function CheckoutScreen({ navigation, route }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sản phẩm đã chọn</Text>
           {selectedItems?.map((item, index) => {
-            const hasRescue = item.rescuePricing?.isAvailable;
-            const displayPrice = hasRescue 
-              ? item.rescuePricing.discountedPrice 
+            const pricingDetail = item?.pricing_detail || null;
+            const hasRescue =
+              Number(pricingDetail?.discounted_quantity || 0) > 0;
+            const displayPrice = hasRescue
+              ? pricingDetail?.line_subtotal || item.productUnit.price
               : item.productUnit.price;
-            
+
             return (
               <View key={`${item.id}-${index}`} style={styles.productItem}>
                 <Image
                   source={{
                     uri:
-                      item.product.image_url || "https://via.placeholder.com/80",
+                      item.product.image_url ||
+                      "https://via.placeholder.com/80",
                   }}
                   style={styles.productImage}
                 />
@@ -464,23 +476,40 @@ export default function CheckoutScreen({ navigation, route }) {
                   <Text style={styles.productName} numberOfLines={2}>
                     {item.product.name}
                   </Text>
-                  <Text style={styles.productUnit}>Đơn vị: {item.unit.name}</Text>
+                  <Text style={styles.productUnit}>
+                    Đơn vị: {item.unit.name}
+                  </Text>
                   <View style={styles.productPriceRow}>
                     {hasRescue ? (
                       <View style={styles.priceWithRescue}>
                         <Text style={styles.originalPrice}>
-                          {item.productUnit.price.toLocaleString("vi-VN")}đ
+                          {Number(
+                            pricingDetail?.line_original_subtotal ||
+                              item.productUnit.price * item.quantity,
+                          ).toLocaleString("vi-VN")}
+                          đ
                         </Text>
                         <View style={styles.rescuePriceContainer}>
                           <Text style={styles.rescuePrice}>
-                            {displayPrice.toLocaleString("vi-VN")}đ
+                            {Number(displayPrice || 0).toLocaleString("vi-VN")}đ
                           </Text>
                           <View style={styles.rescueBadge}>
                             <Text style={styles.rescueBadgeText}>
-                              -{item.rescuePricing.discountPercentage}%
+                              -
+                              {Number(
+                                pricingDetail?.display_discount_percentage ||
+                                  item.rescuePricing?.discountPercentage ||
+                                  0,
+                              )}
+                              %
                             </Text>
                           </View>
                         </View>
+                        <Text style={styles.mixedPriceNote}>
+                          {Number(pricingDetail?.discounted_quantity || 0)} món
+                          giảm, {Number(pricingDetail?.regular_quantity || 0)}{" "}
+                          món thường
+                        </Text>
                       </View>
                     ) : (
                       <Text style={styles.productPrice}>
@@ -910,7 +939,7 @@ export default function CheckoutScreen({ navigation, route }) {
                         } else if (!isEligible) {
                           Alert.alert(
                             "Không đủ điều kiện",
-                            `Đơn hàng tối thiểu ${coupon.min_order_value.toLocaleString("vi-VN")}đ`
+                            `Đơn hàng tối thiểu ${coupon.min_order_value.toLocaleString("vi-VN")}đ`,
                           );
                         } else {
                           Alert.alert("Hết hạn", "Mã giảm giá đã hết hạn");
@@ -945,7 +974,12 @@ export default function CheckoutScreen({ navigation, route }) {
                         </View>
                       )}
                       {isExpired && (
-                        <View style={[styles.couponBadge, styles.couponBadgeExpired]}>
+                        <View
+                          style={[
+                            styles.couponBadge,
+                            styles.couponBadgeExpired,
+                          ]}
+                        >
                           <Text style={styles.couponBadgeText}>Hết hạn</Text>
                         </View>
                       )}
@@ -1151,6 +1185,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: "#FF6B00",
+  },
+  mixedPriceNote: {
+    marginTop: 2,
+    fontSize: 11,
+    color: "#666",
   },
   rescueBadge: {
     backgroundColor: "#FF6B00",

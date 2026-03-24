@@ -186,6 +186,12 @@ export default function ProductDetailScreen({ navigation, route }) {
   };
 
   const currentStock = getCurrentStock();
+  const selectedUnitDisplayDiscount = Number(
+    selectedUnit?.displayRescueDiscount || selectedUnit?.maxRescueDiscount || 0,
+  );
+  const selectedUnitDiscountedStock = Number(
+    selectedUnit?.discounted_stock || 0,
+  );
   const stockStatus =
     currentStock > 10
       ? "Còn hàng"
@@ -288,22 +294,52 @@ export default function ProductDetailScreen({ navigation, route }) {
           {/* Price */}
           {selectedUnit && (
             <View style={styles.priceContainer}>
-              {selectedUnit.maxRescueDiscount > 0 ? (
+              {selectedUnitDisplayDiscount > 0 ? (
                 <View style={styles.priceWithRescue}>
                   <Text style={styles.originalPrice}>
                     {formatPrice(selectedUnit.price)}
                   </Text>
                   <View style={styles.rescuePriceRow}>
                     <Text style={styles.rescuePrice}>
-                      {formatPrice(Math.round(selectedUnit.price * (1 - selectedUnit.maxRescueDiscount / 100)))}
+                      {formatPrice(
+                        Math.round(
+                          selectedUnit.price *
+                            (1 - selectedUnitDisplayDiscount / 100),
+                        ),
+                      )}
                     </Text>
                     <View style={styles.rescueBadge}>
                       <Ionicons name="flash" size={12} color="#fff" />
                       <Text style={styles.rescueBadgeText}>
-                        -{selectedUnit.maxRescueDiscount}%
+                        -{selectedUnitDisplayDiscount}%
                       </Text>
                     </View>
                   </View>
+                  {selectedUnitDiscountedStock > 0 && (
+                    <Text style={styles.discountStockInfo}>
+                      {(() => {
+                        const breakdown = Array.isArray(
+                          selectedUnit?.discounted_stock_breakdown,
+                        )
+                          ? selectedUnit.discounted_stock_breakdown
+                          : [];
+
+                        if (!breakdown.length) {
+                          return `Đang giảm giá trong kho: ${selectedUnitDiscountedStock} sản phẩm`;
+                        }
+
+                        const text = breakdown
+                          .filter((part) => Number(part?.quantity || 0) > 0)
+                          .map(
+                            (part) =>
+                              `${Number(part.quantity)} sp (-${Number(part.discount_percentage || 0)}%)`,
+                          )
+                          .join(", ");
+
+                        return `Đang giảm giá trong kho: ${selectedUnitDiscountedStock} sản phẩm (${text})`;
+                      })()}
+                    </Text>
+                  )}
                   <Text style={styles.priceUnit}>
                     / {selectedUnit.unit_id?.name || "đơn vị"}
                   </Text>
@@ -313,6 +349,31 @@ export default function ProductDetailScreen({ navigation, route }) {
                   <Text style={styles.price}>
                     {formatPrice(selectedUnit.price)}
                   </Text>
+                  {selectedUnitDiscountedStock > 0 && (
+                    <Text style={styles.discountStockInfo}>
+                      {(() => {
+                        const breakdown = Array.isArray(
+                          selectedUnit?.discounted_stock_breakdown,
+                        )
+                          ? selectedUnit.discounted_stock_breakdown
+                          : [];
+
+                        if (!breakdown.length) {
+                          return `Đang giảm giá trong kho: ${selectedUnitDiscountedStock} sản phẩm`;
+                        }
+
+                        const text = breakdown
+                          .filter((part) => Number(part?.quantity || 0) > 0)
+                          .map(
+                            (part) =>
+                              `${Number(part.quantity)} sp (-${Number(part.discount_percentage || 0)}%)`,
+                          )
+                          .join(", ");
+
+                        return `Đang giảm giá trong kho: ${selectedUnitDiscountedStock} sản phẩm (${text})`;
+                      })()}
+                    </Text>
+                  )}
                   <Text style={styles.priceUnit}>
                     / {selectedUnit.unit_id?.name || "đơn vị"}
                   </Text>
@@ -367,13 +428,24 @@ export default function ProductDetailScreen({ navigation, route }) {
                               {unit.unit_id?.name || "Đơn vị"}
                               {unit.unit_value > 1 && ` (${unit.unit_value})`}
                             </Text>
-                            {unit.maxRescueDiscount > 0 && !isOutOfStock && (
-                              <View style={styles.unitRescueBadge}>
-                                <Text style={styles.unitRescueBadgeText}>
-                                  -{unit.maxRescueDiscount}%
-                                </Text>
-                              </View>
-                            )}
+                            {Number(
+                              unit.displayRescueDiscount ||
+                                unit.maxRescueDiscount ||
+                                0,
+                            ) > 0 &&
+                              !isOutOfStock && (
+                                <View style={styles.unitRescueBadge}>
+                                  <Text style={styles.unitRescueBadgeText}>
+                                    -
+                                    {Number(
+                                      unit.displayRescueDiscount ||
+                                        unit.maxRescueDiscount ||
+                                        0,
+                                    )}
+                                    %
+                                  </Text>
+                                </View>
+                              )}
                           </View>
                           <Text
                             style={[
@@ -385,9 +457,44 @@ export default function ProductDetailScreen({ navigation, route }) {
                           >
                             {isOutOfStock ? "Hết hàng" : `Còn ${unitStock}`}
                           </Text>
+                          {Number(unit.discounted_stock || 0) > 0 &&
+                            !isOutOfStock && (
+                              <Text style={styles.unitDiscountInfo}>
+                                {(() => {
+                                  const discounted = Number(
+                                    unit.discounted_stock || 0,
+                                  );
+                                  const breakdown = Array.isArray(
+                                    unit.discounted_stock_breakdown,
+                                  )
+                                    ? unit.discounted_stock_breakdown
+                                    : [];
+
+                                  if (!breakdown.length) {
+                                    return `Đang giảm giá: ${discounted}`;
+                                  }
+
+                                  const text = breakdown
+                                    .filter(
+                                      (part) => Number(part?.quantity || 0) > 0,
+                                    )
+                                    .map(
+                                      (part) =>
+                                        `${Number(part.quantity)} sp (-${Number(part.discount_percentage || 0)}%)`,
+                                    )
+                                    .join(", ");
+
+                                  return `Đang giảm giá: ${discounted} (${text})`;
+                                })()}
+                              </Text>
+                            )}
                         </View>
                         <View style={styles.unitPriceContainer}>
-                          {unit.maxRescueDiscount > 0 && !isOutOfStock ? (
+                          {Number(
+                            unit.displayRescueDiscount ||
+                              unit.maxRescueDiscount ||
+                              0,
+                          ) > 0 && !isOutOfStock ? (
                             <View style={styles.unitPriceWithRescue}>
                               <Text style={styles.unitOriginalPrice}>
                                 {formatPrice(unit.price)}
@@ -399,7 +506,18 @@ export default function ProductDetailScreen({ navigation, route }) {
                                     styles.unitPriceActive,
                                 ]}
                               >
-                                {formatPrice(Math.round(unit.price * (1 - unit.maxRescueDiscount / 100)))}
+                                {formatPrice(
+                                  Math.round(
+                                    unit.price *
+                                      (1 -
+                                        Number(
+                                          unit.displayRescueDiscount ||
+                                            unit.maxRescueDiscount ||
+                                            0,
+                                        ) /
+                                          100),
+                                  ),
+                                )}
                               </Text>
                             </View>
                           ) : (
@@ -531,13 +649,14 @@ export default function ProductDetailScreen({ navigation, route }) {
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>Tổng cộng</Text>
           <Text style={styles.totalPrice}>
-            {selectedUnit 
+            {selectedUnit
               ? formatPrice(
                   Math.round(
-                    (selectedUnit.maxRescueDiscount > 0 
-                      ? selectedUnit.price * (1 - selectedUnit.maxRescueDiscount / 100)
-                      : selectedUnit.price) * quantity
-                  )
+                    (selectedUnit.maxRescueDiscount > 0
+                      ? selectedUnit.price *
+                        (1 - selectedUnit.maxRescueDiscount / 100)
+                      : selectedUnit.price) * quantity,
+                  ),
                 )
               : "0đ"}
           </Text>
@@ -707,6 +826,11 @@ const styles = StyleSheet.create({
     color: "#666",
     marginLeft: 4,
   },
+  discountStockInfo: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#666",
+  },
   descriptionContainer: {
     marginBottom: 24,
   },
@@ -784,6 +908,11 @@ const styles = StyleSheet.create({
   },
   unitStock: {
     fontSize: 13,
+    marginTop: 2,
+  },
+  unitDiscountInfo: {
+    fontSize: 12,
+    color: "#666",
     marginTop: 2,
   },
   unitStockAvailable: {

@@ -41,12 +41,16 @@ export default function ProductCard({ product, onPress }) {
   };
 
   const priceData = getDisplayPrice();
-  const hasRescue = product.maxRescueDiscount > 0;
+  const displayRescueDiscount = Number(
+    product.displayRescueDiscount || product.maxRescueDiscount || 0,
+  );
+  const hasRescue = displayRescueDiscount > 0;
+  const discountedStock = Number(product.discounted_stock || 0);
 
   // Calculate discounted price if rescue pricing exists
   const getDiscountedPrice = (price) => {
     if (!hasRescue) return price;
-    return Math.round(price * (1 - product.maxRescueDiscount / 100));
+    return Math.round(price * (1 - displayRescueDiscount / 100));
   };
 
   return (
@@ -57,15 +61,17 @@ export default function ProductCard({ product, onPress }) {
     >
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: product.image_url || "https://via.placeholder.com/150" }}
+          source={{
+            uri: product.image_url || "https://via.placeholder.com/150",
+          }}
           style={styles.image}
           resizeMode="cover"
         />
-        {product.maxRescueDiscount > 0 && (
+        {hasRescue && (
           <View style={styles.rescueBadge}>
             <Ionicons name="flash" size={12} color="#fff" />
             <Text style={styles.rescueBadgeText}>
-              -{product.maxRescueDiscount}%
+              -{displayRescueDiscount}%
             </Text>
           </View>
         )}
@@ -90,6 +96,31 @@ export default function ProductCard({ product, onPress }) {
                 ? `${getDiscountedPrice(priceData.min).toLocaleString("vi-VN")}đ - ${getDiscountedPrice(priceData.max).toLocaleString("vi-VN")}đ`
                 : `${getDiscountedPrice(priceData.min).toLocaleString("vi-VN")}đ`}
             </Text>
+            {discountedStock > 0 && (
+              <Text style={styles.discountStockText}>
+                {(() => {
+                  const breakdown = Array.isArray(
+                    product.discounted_stock_breakdown,
+                  )
+                    ? product.discounted_stock_breakdown
+                    : [];
+
+                  if (!breakdown.length) {
+                    return `Đang giảm giá: ${discountedStock} sản phẩm`;
+                  }
+
+                  const text = breakdown
+                    .filter((part) => Number(part?.quantity || 0) > 0)
+                    .map(
+                      (part) =>
+                        `${Number(part.quantity)} sp (-${Number(part.discount_percentage || 0)}%)`,
+                    )
+                    .join(", ");
+
+                  return `Đang giảm giá: ${discountedStock} sản phẩm (${text})`;
+                })()}
+              </Text>
+            )}
           </View>
         ) : (
           <Text style={styles.price}>Liên hệ</Text>
@@ -169,6 +200,11 @@ const styles = StyleSheet.create({
   },
   discountedPrice: {
     color: "#FF6B00",
+  },
+  discountStockText: {
+    marginTop: 2,
+    fontSize: 11,
+    color: "#666",
   },
   viewButton: {
     flexDirection: "row",
