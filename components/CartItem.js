@@ -35,12 +35,16 @@ export default function CartItem({ item }) {
     }
   };
 
-  // Check if item has rescue pricing
-  const hasRescue = item.rescuePricing?.isAvailable;
-  const displayPrice = hasRescue 
-    ? item.rescuePricing.discountedPrice 
+  // Prefer backend FEFO pricing detail to reflect mixed discounted/regular quantities.
+  const pricingDetail = item.pricing_detail || null;
+  const hasRescue = Number(pricingDetail?.discounted_quantity || 0) > 0;
+  const displayPrice = hasRescue
+    ? pricingDetail?.allocations?.find((part) => part?.is_discounted)
+        ?.unit_price || item.productUnit.price
     : item.productUnit.price;
-  const subtotal = displayPrice * item.quantity;
+  const subtotal = Number(
+    pricingDetail?.line_subtotal ?? displayPrice * item.quantity,
+  );
 
   // Get unit name from populated unit_id or fallback to 'đơn vị'
   const unitName =
@@ -81,22 +85,63 @@ export default function CartItem({ item }) {
           {hasRescue ? (
             <>
               <Text style={styles.originalPrice}>
-                {item.productUnit.price.toLocaleString("vi-VN")}đ
+                {(pricingDetail?.line_original_subtotal || 0).toLocaleString(
+                  "vi-VN",
+                )}
+                đ
               </Text>
               <View style={styles.rescuePriceRow}>
                 <Text style={styles.rescuePrice}>
-                  {displayPrice.toLocaleString("vi-VN")}đ / {unitName}
+                  {subtotal.toLocaleString("vi-VN")}đ / {item.quantity}{" "}
+                  {unitName}
                 </Text>
                 <View style={styles.rescueBadge}>
                   <Text style={styles.rescueBadgeText}>
-                    -{item.rescuePricing.discountPercentage}%
+                    -
+                    {pricingDetail?.display_discount_percentage ||
+                      item.rescuePricing?.discountPercentage ||
+                      0}
+                    %
                   </Text>
                 </View>
               </View>
+              <Text style={styles.breakdownText}>
+                {Number(pricingDetail?.discounted_quantity || 0)} món giảm giá,{" "}
+                {Number(pricingDetail?.regular_quantity || 0)} món thường
+              </Text>
             </>
           ) : (
             <Text style={styles.price}>
               {item.productUnit.price.toLocaleString("vi-VN")}đ / {unitName}
+            </Text>
+          )}
+
+          {Number(pricingDetail?.discounted_available_quantity || 0) > 0 && (
+            <Text style={styles.discountStockText}>
+              {(() => {
+                const totalDiscounted = Number(
+                  pricingDetail?.discounted_available_quantity || 0,
+                );
+                const breakdown = Array.isArray(
+                  pricingDetail?.discounted_stock_breakdown,
+                )
+                  ? pricingDetail.discounted_stock_breakdown
+                  : [];
+
+                if (!breakdown.length) {
+                  return `Đang giảm giá trong kho: ${totalDiscounted} sản phẩm`;
+                }
+
+                const text = breakdown
+                  .filter((part) => Number(part?.quantity || 0) > 0)
+                  .map(
+                    (part) =>
+                      `${Number(part.quantity)} sp (-${Number(part.discount_percentage || 0)}%)`,
+                  )
+                  .join(", ");
+
+                return `Đang giảm giá trong kho: ${totalDiscounted} sản phẩm (${text})`;
+              })()}
             </Text>
           )}
         </View>
@@ -218,6 +263,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#fff",
     fontWeight: "700",
+  },
+  breakdownText: {
+    fontSize: 12,
+    color: "#FF6B00",
+    marginTop: 2,
+  },
+  discountStockText: {
+    fontSize: 11,
+    color: "#666",
+    marginTop: 2,
   },
   footer: {
     flexDirection: "row",

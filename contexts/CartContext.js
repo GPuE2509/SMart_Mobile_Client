@@ -35,12 +35,12 @@ export const CartProvider = ({ children }) => {
     try {
       setIsLoading(true);
       const data = await orderService.getCart();
-      
+
       // Inject "selected" property since the backend doesn't track UI selection status
-      const mappedItems = (data.data || []).map(item => ({
+      const mappedItems = (data.data || []).map((item) => ({
         ...item,
         id: item._id, // Map for UI compatibility
-        selected: true
+        selected: true,
       }));
       setCartItems(mappedItems);
     } catch (error) {
@@ -84,7 +84,7 @@ export const CartProvider = ({ children }) => {
       setIsLoading(true);
       const response = await orderService.addRecipeToCart(recipeId);
       await loadCartAPI(); // Reload from server to get accurate IDs and sync
-      
+
       return response; // Return the full response for caller to handle
     } catch (error) {
       console.error("Add recipe to cart error:", error);
@@ -151,15 +151,15 @@ export const CartProvider = ({ children }) => {
   const toggleSelectItem = (cartItemId) => {
     setCartItems((prevItems) =>
       prevItems.map((item) =>
-        item.id === cartItemId ? { ...item, selected: !item.selected } : item
-      )
+        item.id === cartItemId ? { ...item, selected: !item.selected } : item,
+      ),
     );
   };
 
   const toggleSelectAll = () => {
     const allSelected = cartItems.every((item) => item.selected);
     setCartItems((prevItems) =>
-      prevItems.map((item) => ({ ...item, selected: !allSelected }))
+      prevItems.map((item) => ({ ...item, selected: !allSelected })),
     );
   };
 
@@ -183,35 +183,39 @@ export const CartProvider = ({ children }) => {
       ? cartItems.filter((item) => item.selected)
       : cartItems;
 
-    let originalSubtotal = 0;
-    let rescueSavings = 0;
+    const originalSubtotal = items.reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item?.pricing_detail?.line_original_subtotal ??
+            (item?.productUnit?.price || 0) * (item?.quantity || 0),
+        ),
+      0,
+    );
 
-    const subtotal = items.reduce((total, item) => {
-      // Use rescue pricing if available, otherwise use regular price
-      const hasRescue = item.rescuePricing?.isAvailable;
-      const price = hasRescue 
-        ? item.rescuePricing.discountedPrice 
-        : (item.productUnit?.price || 0);
-      
-      const originalPrice = item.productUnit?.price || 0;
-      originalSubtotal += originalPrice * item.quantity;
-      
-      if (hasRescue) {
-        // Backend already calculated savings with quantity included
-        rescueSavings += item.rescuePricing.savings || 0;
-      }
-      
-      return total + price * item.quantity;
-    }, 0);
+    const subtotal = items.reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item?.pricing_detail?.line_subtotal ??
+            (item?.productUnit?.price || 0) * (item?.quantity || 0),
+        ),
+      0,
+    );
+
+    const rescueSavings = Math.max(0, originalSubtotal - subtotal);
 
     const totalTax = items.reduce((total, item) => {
-      // Tax is calculated on discounted price if rescue pricing applies
-      const hasRescue = item.rescuePricing?.isAvailable;
-      const price = hasRescue 
-        ? item.rescuePricing.discountedPrice 
-        : (item.productUnit?.price || 0);
-      const taxPercent = item.product?.tax_percentage || 0;
-      const itemTax = Math.round((price * item.quantity * taxPercent) / 100);
+      const taxFromPricing = item?.pricing_detail?.line_tax_amount;
+      if (taxFromPricing !== undefined && taxFromPricing !== null) {
+        return total + Number(taxFromPricing || 0);
+      }
+
+      const fallbackPrice = item?.productUnit?.price || 0;
+      const taxPercent = item?.product?.tax_percentage || 0;
+      const itemTax = Math.round(
+        (fallbackPrice * (item?.quantity || 0) * taxPercent) / 100,
+      );
       return total + itemTax;
     }, 0);
 
@@ -235,14 +239,16 @@ export const CartProvider = ({ children }) => {
   };
 
   const getCartItemQuantity = (productUnitId) => {
-    const item = cartItems.find((item) => item.product_unit_id === productUnitId);
+    const item = cartItems.find(
+      (item) => item.product_unit_id === productUnitId,
+    );
     return item ? item.quantity : 0;
   };
 
   const removeSelectedItems = async () => {
     const selected = getSelectedItems();
     for (const item of selected) {
-        await removeFromCart(item.id);
+      await removeFromCart(item.id);
     }
   };
 
@@ -257,6 +263,8 @@ export const CartProvider = ({ children }) => {
     clearCart,
     cartItemCount: getCartItemCount(),
     cartTotal: getCartTotal(),
+    selectedCartTotal: getCartTotal(true),
+    calculateCartTotal: getCartTotal,
     isInCart,
     getCartItemQuantity,
     toggleSelectItem,

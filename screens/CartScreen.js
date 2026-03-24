@@ -20,7 +20,7 @@ export default function CartScreen({ navigation }) {
   const { user } = useAuth();
   const {
     cartItems,
-    cartTotal,
+    selectedCartTotal,
     clearCart,
     toggleSelectAll,
     getSelectedItems,
@@ -294,41 +294,41 @@ export default function CartScreen({ navigation }) {
 
           <View style={styles.footer}>
             {/* Price Summary */}
-            {cartTotal.rescueSavings > 0 && (
+            {selectedCartTotal.rescueSavings > 0 && (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Giá gốc:</Text>
                 <Text style={styles.summaryValue}>
-                  {cartTotal.originalSubtotal.toLocaleString("vi-VN")}đ
+                  {selectedCartTotal.originalSubtotal.toLocaleString("vi-VN")}đ
                 </Text>
               </View>
             )}
-            {cartTotal.rescueSavings > 0 && (
+            {selectedCartTotal.rescueSavings > 0 && (
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, styles.savingsLabel]}>
                   🌟 Chương trình giảm giá:
                 </Text>
                 <Text style={[styles.summaryValue, styles.savingsValue]}>
-                  -{cartTotal.rescueSavings.toLocaleString("vi-VN")}đ
+                  -{selectedCartTotal.rescueSavings.toLocaleString("vi-VN")}đ
                 </Text>
               </View>
             )}
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Tạm tính:</Text>
               <Text style={styles.summaryValue}>
-                {cartTotal.subtotal.toLocaleString("vi-VN")}đ
+                {selectedCartTotal.subtotal.toLocaleString("vi-VN")}đ
               </Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Thuế:</Text>
               <Text style={styles.summaryValue}>
-                {cartTotal.taxAmount.toLocaleString("vi-VN")}đ
+                {selectedCartTotal.taxAmount.toLocaleString("vi-VN")}đ
               </Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.summaryRow}>
               <Text style={styles.totalLabel}>Tổng cộng:</Text>
               <Text style={styles.totalValue}>
-                {cartTotal.total.toLocaleString("vi-VN")}đ
+                {selectedCartTotal.total.toLocaleString("vi-VN")}đ
               </Text>
             </View>
 
