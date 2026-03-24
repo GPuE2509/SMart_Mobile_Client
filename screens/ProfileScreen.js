@@ -8,6 +8,7 @@ import profileService from '../services/profileService';
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState(null);
 
   useEffect(() => {
     loadProfile();
@@ -28,6 +29,7 @@ export default function ProfileScreen({ navigation }) {
       if (response.data.avatar_url) {
         setAvatarUrl(response.data.avatar_url);
       }
+      setQrCodeUrl(response.data.qr_code_url || null);
     } catch (error) {
       console.error('Error loading profile:', error);
     }
@@ -70,6 +72,14 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.userName}>{user.full_name || 'Người dùng'}</Text>
               <Text style={styles.userEmail}>{user.email}</Text>
               {user.phone && <Text style={styles.userPhone}>{user.phone}</Text>}
+            </View>
+          )}
+
+          {!!qrCodeUrl && (
+            <View style={styles.qrSection}>
+              <Text style={styles.qrTitle}>Mã QR khách hàng</Text>
+              <Image source={{ uri: qrCodeUrl }} style={styles.qrImage} />
+              <Text style={styles.qrHint}>Đưa mã này cho nhân viên để quét khi thanh toán tại quầy.</Text>
             </View>
           )}
         </View>
@@ -186,6 +196,33 @@ const styles = StyleSheet.create({
   userPhone: {
     fontSize: 14,
     color: '#666',
+  },
+  qrSection: {
+    marginTop: 16,
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    width: '100%',
+  },
+  qrTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  qrImage: {
+    width: 180,
+    height: 180,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  qrHint: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
   },
   menuContainer: {
     marginTop: 16,
